@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-slate-200; }
+  html { @apply scroll-smooth; }
+  body { @apply bg-slate-50 text-slate-900 antialiased font-sans selection:bg-hospital-100 selection:text-hospital-900; }
+  :focus-visible { @apply outline-none ring-2 ring-hospital-500 ring-offset-2 ring-offset-white; }
+  h1, h2, h3 { @apply tracking-tight; }
+}
+
+@layer utilities {
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: theme("colors.slate.300") transparent; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: theme("colors.slate.300"); border-radius: 999px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0.8cm;
+  }
+  tr, td {
+    height: auto !important;
+    min-height: unset !important;
+    vertical-align: top;
+  }
+  .print-expand-text {
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+}
+
