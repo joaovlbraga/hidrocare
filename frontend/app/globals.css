@@ -25,22 +25,102 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────
+   PRINT — A4 Landscape, Single Page, Clinical Grid
+   ───────────────────────────────────────────────────────── */
 @media print {
+  /* Force A4 landscape with tight margins */
   @page {
     size: A4 landscape;
-    margin: 0.8cm;
+    margin: 5mm 6mm;
   }
-  tr, td {
-    height: auto !important;
+
+  /* Reset browser-injected chrome */
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Remove all scrollbars and overflow that can affect layout */
+  * {
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Table: compress to fit 200 mm vertical budget ───── */
+
+  /* Global table font: 8px is the smallest legible size for a printed grid */
+  .print-table {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  /* Table header cells */
+  .print-table thead th {
+    font-size: 7px !important;
+    padding: 1.5px 2px !important;
+    line-height: 1.15 !important;
+  }
+
+  /* Data rows: fixed compact height */
+  .print-table tbody tr {
+    height: 5.8mm !important;
     min-height: unset !important;
-    vertical-align: top;
+    max-height: 6mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
+
+  /* Data cells */
+  .print-table tbody td {
+    padding: 1px 2px !important;
+    height: auto !important;
+    vertical-align: middle !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+    overflow: hidden !important;
+  }
+
+  /* Totals footer: glue to bottom of table */
+  .print-table tfoot {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  .print-table tfoot td {
+    padding: 2px 2px !important;
+    font-size: 8px !important;
+  }
+
+  /* ── Text expansion for multi-item cells ─────────────── */
   .print-expand-text {
     white-space: pre-wrap !important;
     overflow: visible !important;
     text-overflow: clip !important;
     word-break: break-word;
     overflow-wrap: anywhere;
+    font-size: 7px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* ── Prevent ANY page break inside the whole spreadsheet */
+  .print-no-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── Ensure the signature footer stays on the same page ─ */
+  .print-signature {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
   }
 }
-

@@ -16,8 +16,6 @@ SINGLE_VALUE_CATEGORIES = {
     FluidType.IV_HYDRATION,
     FluidType.URINE,
     FluidType.SNE_SNG,
-    FluidType.DRAIN,
-    FluidType.STOOL,
 }
 
 
@@ -30,13 +28,14 @@ def create_record(payload: FluidRecordCreate, db: Session = Depends(get_db), cur
     vol_num: float | None = None
     qual_str: str | None = None
 
-    if isinstance(raw_vol, (int, float)):
-        vol_num = float(raw_vol)
-    elif isinstance(raw_vol, str):
-        try:
-            vol_num = float(raw_vol.strip())
-        except ValueError:
-            qual_str = raw_vol.strip()
+    if raw_vol is not None:
+        if isinstance(raw_vol, (int, float)):
+            vol_num = float(raw_vol)
+        elif isinstance(raw_vol, str):
+            try:
+                vol_num = float(raw_vol.strip())
+            except ValueError:
+                qual_str = raw_vol.strip()
 
     if payload.category in SINGLE_VALUE_CATEGORIES:
         existing = db.scalars(

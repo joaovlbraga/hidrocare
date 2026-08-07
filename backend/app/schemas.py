@@ -77,18 +77,18 @@ class FluidRecordCreate(BaseModel):
     patient_id: int
     direction: FluidDirection
     category: FluidType
-    volume_ml: float | str = Field(description="Volume em ml ou medição qualitativa (+, ++, +++)")
+    volume_ml: float | str | None = Field(default=None, description="Volume em ml ou medição qualitativa (+, ++, +++). Obrigatório a menos que 'notes' seja fornecido.")
     occurred_at: datetime
     notes: str | None = Field(default=None, max_length=1000)
 
     @field_validator("volume_ml", mode="before")
     @classmethod
-    def validate_volume(cls, v: float | str | int | None) -> float | str:
+    def validate_volume(cls, v: float | str | int | None) -> float | str | None:
         if v is None:
-            raise ValueError("volume_ml não pode ser nulo")
+            return None
         s = str(v).strip()
         if not s:
-            raise ValueError("volume_ml não pode ser vazio")
+            return None
         if len(s) > 50:
             raise ValueError("volume_ml excede 50 caracteres")
         try:
@@ -97,10 +97,15 @@ class FluidRecordCreate(BaseModel):
             return s
 
     @model_validator(mode="after")
-    def validate_category_direction(self):
+    def validate_record(self):
+        """Validate: (1) volume_ml or notes required; (2) direction must match category."""
+        if self.volume_ml is None and not self.notes:
+            raise ValueError("Informe o volume (ml) ou uma descrição/nota para o lançamento.")
         inputs = {
             FluidType.ORAL_DIET,
             FluidType.ENTERAL_DIET,
+            FluidType.PARENTERAL_NUTRITION,
+            FluidType.FILTERED_WATER,
             FluidType.IV_HYDRATION,
             FluidType.MEDICATION,
             FluidType.TRANSFUSION,

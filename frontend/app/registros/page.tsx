@@ -46,7 +46,7 @@ export default function RecordsPage() {
 
   return (
     <AppShell>
-      <div className="space-y-3">
+      <div className="space-y-3 print:space-y-1.5">
         {/* Compact Top Header & Control Bar (Hidden on Print) */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs print:hidden">
           <div className="flex items-center gap-3">
@@ -118,17 +118,17 @@ export default function RecordsPage() {
 
         {/* Print-Only Official Header Banner */}
         {activePatient && (
-          <div className="hidden print:block mb-3 border-b-2 border-slate-900 pb-2 text-slate-900">
+          <div className="hidden print:block print:mb-1.5 border-b-2 border-slate-900 pb-1.5 text-slate-900">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-base font-bold uppercase tracking-wider">HidroCare — Balanço Hídrico da UTI (24h)</h1>
-                <p className="text-xs text-slate-700">Registro Clínico Assistencial do Plantão</p>
+                <h1 className="text-sm font-bold uppercase tracking-wider leading-tight">HidroCare — Balanço Hídrico da UTI (24h)</h1>
+                <p className="text-[10px] text-slate-700">Registro Clínico Assistencial do Plantão</p>
               </div>
-              <div className="text-right text-xs">
+              <div className="text-right text-[10px]">
                 <p><strong>Data do Plantão:</strong> {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
               </div>
             </div>
-            <div className="mt-2 grid grid-cols-5 gap-2 text-xs bg-slate-50 p-2 rounded border border-slate-300">
+            <div className="mt-1 grid grid-cols-5 gap-2 text-[10px] bg-slate-50 px-2 py-1 rounded border border-slate-300">
               <p><strong>Paciente:</strong> {activePatient.full_name}</p>
               <p><strong>Unidade:</strong> {activePatient.uti || "UTI 1"}</p>
               <p><strong>Leito:</strong> {activePatient.bed}</p>

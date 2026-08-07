@@ -187,7 +187,8 @@ def test_multi_item_categories_still_allow_multiple_records(client):
     assert len(fluids) == 2
 
 
-def test_qualitative_value_upsert_preserved(client):
+def test_stool_is_multi_item(client):
+    """STOOL is now multi-item: each POST creates a new row (no upsert)."""
     res_p = client.post(
         "/api/v1/patients",
         json={
@@ -199,7 +200,6 @@ def test_qualitative_value_upsert_preserved(client):
     )
     patient_id = res_p.json()["id"]
 
-    # Initial numeric POST
     r1 = client.post(
         "/api/v1/balances/records",
         json={
@@ -212,7 +212,7 @@ def test_qualitative_value_upsert_preserved(client):
     )
     assert r1.status_code == 201
 
-    # Upsert to qualitative "++"
+    # Second entry at the SAME hour must create a NEW row (not upsert)
     r2 = client.post(
         "/api/v1/balances/records",
         json={
@@ -224,11 +224,11 @@ def test_qualitative_value_upsert_preserved(client):
         },
     )
     assert r2.status_code == 201
-    assert r2.json()["id"] == r1.json()["id"]
+    assert r2.json()["id"] != r1.json()["id"]
 
     rec_res = client.get(f"/api/v1/balances/patients/{patient_id}/records?target_date=2026-08-06")
     fluids = rec_res.json()["fluids"]
-    assert len(fluids) == 1
-    assert fluids[0]["qualitative_value"] == "++"
-    assert fluids[0]["volume_ml"] == "++"
-
+    stool_records = [f for f in fluids if f["category"] == "STOOL"]
+    assert len(stool_records) == 2
+    qual_records = [f for f in stool_records if f.get("qualitative_value") == "++"]
+    assert len(qual_records) == 1

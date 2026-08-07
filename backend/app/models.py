@@ -16,6 +16,8 @@ class UserRole(str, enum.Enum):
 class FluidType(str, enum.Enum):
     ORAL_DIET = "ORAL_DIET"
     ENTERAL_DIET = "ENTERAL_DIET"
+    PARENTERAL_NUTRITION = "PARENTERAL_NUTRITION"
+    FILTERED_WATER = "FILTERED_WATER"
     IV_HYDRATION = "IV_HYDRATION"
     MEDICATION = "MEDICATION"
     TRANSFUSION = "TRANSFUSION"
@@ -81,15 +83,11 @@ class FluidRecord(Base):
                 "IV_HYDRATION",
                 "URINE",
                 "SNE_SNG",
-                "DRAIN",
-                "STOOL",
             ]),
             sqlite_where=column("category").in_([
                 "IV_HYDRATION",
                 "URINE",
                 "SNE_SNG",
-                "DRAIN",
-                "STOOL",
             ]),
         ),
     )

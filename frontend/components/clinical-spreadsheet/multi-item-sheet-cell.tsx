@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, Loader2, Pill, Lock } from "lucide-react";
+import { Plus, Trash2, Loader2, Pill, Lock, Pencil, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,16 @@ import { FluidRecord } from "./types";
 
 export type MultiItemSheetCellProps = {
   hour: string;
-  category: "MEDICATION" | "OTHER_INPUT" | "OTHER_OUTPUT";
+  category: "MEDICATION" | "OTHER_INPUT" | "OTHER_OUTPUT" | "DRAIN" | "STOOL";
   direction: "INPUT" | "OUTPUT";
   title: string;
   records: FluidRecord[];
   isReadOnly?: boolean;
-  onAdd: (hour: string, category: string, direction: "INPUT" | "OUTPUT", volumeMl: number, notes: string) => Promise<void>;
+  /** Volume is optional for DRAIN/STOOL — notes alone are sufficient. */
+  volumeOptional?: boolean;
+  onAdd: (hour: string, category: string, direction: "INPUT" | "OUTPUT", volumeMl: number | null, notes: string) => Promise<void>;
   onDelete: (recordId: number) => Promise<void>;
+  onEdit: (recordId: number, volumeMl: number | null, notes: string) => Promise<void>;
 };
 
 export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
@@ -34,42 +37,86 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
   title,
   records,
   isReadOnly,
+  volumeOptional = false,
   onAdd,
   onDelete,
+  onEdit,
 }: MultiItemSheetCellProps) {
   const [open, setOpen] = useState(false);
   const [itemVol, setItemVol] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+
   const totalVol = records.reduce((sum, r) => sum + (parseFloat(String(r.volume_ml ?? 0)) || 0), 0);
 
-  async function handleAddItem(e: React.FormEvent) {
+  function startEdit(r: FluidRecord) {
+    setEditingId(r.id);
+    setItemVol(r.volume_ml !== null && r.volume_ml !== undefined ? String(r.volume_ml) : "");
+    setItemNotes(r.notes ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setItemVol("");
+    setItemNotes("");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const vol = parseFloat(itemVol.trim());
-    if (!vol || vol <= 0) return;
+    const vol = itemVol.trim() === "" ? null : parseFloat(itemVol.trim());
+    const notes = itemNotes.trim();
+
+    // At least one of volume or notes must be present
+    if (vol === null && !notes) return;
+    // If volume is required (non-DRAIN/STOOL) and missing, bail
+    if (!volumeOptional && (vol === null || isNaN(vol) || vol <= 0)) return;
 
     setSaving(true);
     try {
-      await onAdd(hour, category, direction, vol, itemNotes.trim());
-      setItemVol("");
-      setItemNotes("");
+      if (editingId !== null) {
+        await onEdit(editingId, vol, notes);
+        cancelEdit();
+      } else {
+        await onAdd(hour, category, direction, vol, notes);
+        setItemVol("");
+        setItemNotes("");
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  const printSummaryText = records.length > 0
-    ? records.map((r) => `${r.notes ? r.notes + " " : ""}(${r.volume_ml}ml)`).join("\n")
-    : "—";
+  const isEditing = editingId !== null;
+
+  // Display label for the record volume (may be qualitative)
+  function recordVolLabel(r: FluidRecord): string {
+    if (r.qualitative_value) return r.qualitative_value;
+    if (r.volume_ml !== null && r.volume_ml !== undefined) return `${r.volume_ml} ml`;
+    return "—";
+  }
+
+  const printSummaryText =
+    records.length > 0
+      ? records
+          .map((r) => `${r.notes ? r.notes + " " : ""}(${recordVolLabel(r)})`)
+          .join("\n")
+      : "—";
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) cancelEdit(); }}>
       <SheetTrigger asChild>
-        <div className={cn("flex min-h-7 h-full w-full cursor-pointer items-center justify-center transition-colors hover:bg-slate-100/70 p-0.5 print:p-1 print:h-auto print:min-h-0 print:align-top", isReadOnly && "cursor-default")}>
+        <div
+          className={cn(
+            "flex min-h-7 h-full w-full cursor-pointer items-center justify-center transition-colors hover:bg-slate-100/70 p-0.5 print:p-1 print:h-auto print:min-h-0 print:align-top",
+            isReadOnly && "cursor-default"
+          )}
+        >
           {records.length > 0 ? (
             <div className="flex items-center gap-1 text-slate-800 font-mono text-[11px] font-semibold print:hidden">
-              <span>{totalVol} ml</span>
+              {totalVol > 0 && <span>{totalVol} ml</span>}
               <span className="rounded bg-slate-200 px-1 py-0.2 text-[9px] font-bold text-slate-600">
                 {records.length}
               </span>
@@ -92,6 +139,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
           </span>
         </div>
       </SheetTrigger>
+
       <SheetContent side="right" className="w-[380px] sm:w-[440px] p-6 print:hidden">
         <SheetHeader className="border-b pb-4">
           <SheetTitle className="flex items-center gap-2 text-base font-bold text-slate-900">
@@ -99,38 +147,69 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
             {title} — Horário {hour}
           </SheetTitle>
           <SheetDescription className="text-xs text-slate-600">
-            Gerencie múltiplos lançamentos e medicamentos para este horário específico.
+            Gerencie múltiplos lançamentos para este horário específico.
           </SheetDescription>
         </SheetHeader>
 
         {!isReadOnly && (
-          <form onSubmit={handleAddItem} className="mt-5 space-y-3.5 border-b pb-5">
+          <form onSubmit={handleSubmit} className="mt-5 space-y-3.5 border-b pb-5">
+            {isEditing && (
+              <div className="flex items-center justify-between rounded-md bg-blue-50 border border-blue-200 px-3 py-1.5">
+                <span className="text-xs font-semibold text-blue-700">Modo edição</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={cancelEdit}
+                  className="h-6 w-6 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Descrição / Nome do Medicamento</label>
+              <label className="text-xs font-semibold text-slate-700">
+                Descrição / Nome
+              </label>
               <Input
-                placeholder="Ex: Noradrenalina 0.1 mcg/kg/min"
+                placeholder={volumeOptional ? "Ex: Dreno de Tórax, Penrose..." : "Ex: Noradrenalina 0.1 mcg/kg/min"}
                 value={itemNotes}
                 onChange={(e) => setItemNotes(e.target.value)}
                 className="h-8 text-xs"
-                required
+                required={volumeOptional}
               />
             </div>
+
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Volume Infundido / Administrado (ml)</label>
+              <label className="text-xs font-semibold text-slate-700">
+                Volume (ml){volumeOptional && <span className="ml-1 font-normal text-slate-500">(opcional)</span>}
+              </label>
               <Input
                 type="number"
-                min="1"
+                min="0"
                 max="5000"
                 placeholder="Ex: 50"
                 value={itemVol}
                 onChange={(e) => setItemVol(e.target.value)}
                 className="h-8 text-xs font-mono"
-                required
+                required={!volumeOptional}
               />
             </div>
-            <Button type="submit" disabled={saving} className="w-full h-8 bg-hospital-600 hover:bg-hospital-700 text-xs font-semibold">
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-              Adicionar Lançamento
+
+            <Button
+              type="submit"
+              disabled={saving}
+              className="w-full h-8 bg-hospital-600 hover:bg-hospital-700 text-xs font-semibold"
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : isEditing ? (
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 mr-1" />
+              )}
+              {isEditing ? "Atualizar Lançamento" : "Adicionar Lançamento"}
             </Button>
           </form>
         )}
@@ -138,28 +217,50 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
         <div className="mt-4 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b pb-2">
             <span>Lançamentos Registrados ({records.length})</span>
-            <span className="font-mono text-hospital-700 font-extrabold">{totalVol} ml Total</span>
+            {totalVol > 0 && (
+              <span className="font-mono text-hospital-700 font-extrabold">{totalVol} ml Total</span>
+            )}
           </div>
 
           {records.length === 0 ? (
-            <p className="py-6 text-center text-xs text-slate-600 italic">Nenhum item registrado para este horário.</p>
+            <p className="py-6 text-center text-xs text-slate-600 italic">
+              Nenhum item registrado para este horário.
+            </p>
           ) : (
             <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
               {records.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-md border bg-slate-50 p-2.5 text-xs">
-                  <div className="space-y-0.5 max-w-[240px]">
+                <div
+                  key={r.id}
+                  className={cn(
+                    "flex items-center justify-between rounded-md border bg-slate-50 p-2.5 text-xs",
+                    editingId === r.id && "border-blue-300 bg-blue-50"
+                  )}
+                >
+                  <div className="space-y-0.5 max-w-[200px]">
                     <p className="font-semibold text-slate-800 truncate">{r.notes || "Sem descrição"}</p>
-                    <p className="font-mono font-bold text-hospital-600 text-[11px]">{r.volume_ml} ml</p>
+                    <p className="font-mono font-bold text-hospital-600 text-[11px]">{recordVolLabel(r)}</p>
                   </div>
                   {!isReadOnly && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onDelete(r.id)}
-                      className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => startEdit(r)}
+                        className="h-7 w-7 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                        title="Editar"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDelete(r.id)}
+                        className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}

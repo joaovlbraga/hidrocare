@@ -26,7 +26,7 @@ export type NutritionSheetCellProps = {
   hour: string;
   records: FluidRecord[];
   isReadOnly?: boolean;
-  onAdd: (hour: string, category: "ORAL_DIET" | "ENTERAL_DIET", volumeMl: number, notes: string) => Promise<void>;
+  onAdd: (hour: string, category: "ORAL_DIET" | "ENTERAL_DIET" | "PARENTERAL_NUTRITION" | "FILTERED_WATER", volumeMl: number, notes: string) => Promise<void>;
   onDelete: (recordId: number) => Promise<void>;
 };
 
@@ -38,7 +38,7 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
   onDelete,
 }: NutritionSheetCellProps) {
   const [open, setOpen] = useState(false);
-  const [dietType, setDietType] = useState<"ORAL_DIET" | "ENTERAL_DIET">("ORAL_DIET");
+  const [dietType, setDietType] = useState<"ORAL_DIET" | "ENTERAL_DIET" | "PARENTERAL_NUTRITION" | "FILTERED_WATER">("ORAL_DIET");
   const [itemVol, setItemVol] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -60,9 +60,19 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
     }
   }
 
-  const printSummaryText = records.length > 0
-    ? records.map((r) => `${r.category === "ORAL_DIET" ? "VO" : "SNE"}${r.notes ? " " + r.notes : ""} (${r.volume_ml}ml)`).join("\n")
-    : "—";
+  const printSummaryText =
+    records.length > 0
+      ? records
+          .map((r) => {
+            const label =
+              r.category === "ORAL_DIET" ? "VO" :
+              r.category === "ENTERAL_DIET" ? "SNE" :
+              r.category === "PARENTERAL_NUTRITION" ? "NPT" :
+              r.category === "FILTERED_WATER" ? "H₂O" : r.category;
+            return `${label}${r.notes ? " " + r.notes : ""} (${r.volume_ml}ml)`;
+          })
+          .join("\n")
+      : "—";
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -115,6 +125,8 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
                 <SelectContent>
                   <SelectItem value="ORAL_DIET" className="text-xs">Dieta Oral (VO)</SelectItem>
                   <SelectItem value="ENTERAL_DIET" className="text-xs">Dieta Enteral (SNE / SNG)</SelectItem>
+                  <SelectItem value="PARENTERAL_NUTRITION" className="text-xs">Nutrição Parenteral (NPT)</SelectItem>
+                  <SelectItem value="FILTERED_WATER" className="text-xs">Água Filtrada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -165,7 +177,10 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
                   <div className="space-y-0.5 max-w-[240px]">
                     <div className="flex items-center gap-1.5">
                       <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                        {r.category === "ORAL_DIET" ? "Dieta Oral" : "Dieta Enteral"}
+                        {r.category === "ORAL_DIET" ? "Dieta Oral" :
+                         r.category === "ENTERAL_DIET" ? "Dieta Enteral" :
+                         r.category === "PARENTERAL_NUTRITION" ? "NPT" :
+                         r.category === "FILTERED_WATER" ? "Água Filtrada" : r.category}
                       </span>
                       <span className="font-mono font-bold text-slate-900">{r.volume_ml} ml</span>
                     </div>

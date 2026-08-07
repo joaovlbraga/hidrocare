@@ -252,7 +252,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       hour: string,
       category: string,
       direction: "INPUT" | "OUTPUT",
-      volumeMl: number,
+      volumeMl: number | null,
       notes: string
     ) => {
       const occurredAt = getOccurredAt(targetDate, hour);
@@ -284,10 +284,34 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
     [patientId, targetDate, refreshDailyBalance]
   );
 
+  const handleUpdateRecord = useCallback(
+    async (recordId: number, volumeMl: number | null, notes: string) => {
+      const res = await apiFetch(`/balances/records/${recordId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ volume_ml: volumeMl, notes }),
+      });
+      setFluids((prev) =>
+        prev.map((r) =>
+          r.id === recordId
+            ? {
+                ...r,
+                volume_ml: res.volume_ml ?? volumeMl,
+                qualitative_value: res.qualitative_value ?? null,
+                notes: res.notes ?? notes,
+              }
+            : r
+        )
+      );
+      refreshDailyBalance();
+    },
+    [refreshDailyBalance]
+  );
+
+
   const handleAddNutritionRecord = useCallback(
     async (
       hour: string,
-      category: "ORAL_DIET" | "ENTERAL_DIET",
+      category: "ORAL_DIET" | "ENTERAL_DIET" | "PARENTERAL_NUTRITION" | "FILTERED_WATER",
       volumeMl: number,
       notes: string
     ) => {
@@ -397,9 +421,9 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="rounded-xl border border-slate-200 bg-white text-slate-900 shadow-card overflow-hidden print:border-black print:bg-white print:text-black">
+      <div className="rounded-xl border border-slate-200 bg-white text-slate-900 shadow-card overflow-hidden print-no-break print:border-black print:bg-white print:text-black print:rounded-none print:shadow-none">
         <div className="w-full overflow-x-auto print:overflow-visible">
-          <table className="w-full border-collapse text-xs print:text-[10px]">
+          <table className="w-full border-collapse text-xs print-table">
             <thead>
               {/* Header Row 1: Section Groups */}
               <tr className="border-b border-slate-200 bg-slate-100 font-bold tracking-wider text-slate-700 uppercase print:bg-slate-100 print:text-black print:border-black">
@@ -437,16 +461,18 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                 const nutritionList = [
                   ...(fluidsByHourCategoryMap.get(`${hour}-ORAL_DIET`) || []),
                   ...(fluidsByHourCategoryMap.get(`${hour}-ENTERAL_DIET`) || []),
+                  ...(fluidsByHourCategoryMap.get(`${hour}-PARENTERAL_NUTRITION`) || []),
+                  ...(fluidsByHourCategoryMap.get(`${hour}-FILTERED_WATER`) || []),
                 ];
                 const ivRecord = (fluidsByHourCategoryMap.get(`${hour}-IV_HYDRATION`) || [])[0];
                 const urineRecord = (fluidsByHourCategoryMap.get(`${hour}-URINE`) || [])[0];
                 const sneRecord = (fluidsByHourCategoryMap.get(`${hour}-SNE_SNG`) || [])[0];
-                const drainRecord = (fluidsByHourCategoryMap.get(`${hour}-DRAIN`) || [])[0];
-                const stoolRecord = (fluidsByHourCategoryMap.get(`${hour}-STOOL`) || [])[0];
+                const drainList = fluidsByHourCategoryMap.get(`${hour}-DRAIN`) || [];
+                const stoolList = fluidsByHourCategoryMap.get(`${hour}-STOOL`) || [];
                 const otherOutputList = fluidsByHourCategoryMap.get(`${hour}-OTHER_OUTPUT`) || [];
 
                 return (
-                  <tr key={hour} className="h-7 hover:bg-slate-50/80 transition-colors print:h-auto print:hover:bg-transparent">
+                  <tr key={hour} className="h-7 hover:bg-slate-50/80 transition-colors print:h-auto print:hover:bg-transparent print:break-inside-avoid">
                     {/* HORA */}
                     <td className="p-0.5 text-center font-bold text-slate-700 bg-slate-100 border-r border-slate-200 print:bg-white print:text-black print:border-black print:h-auto print:align-top">
                       {hour}
@@ -464,6 +490,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
+                        onEdit={handleUpdateRecord}
                       />
                     </td>
 
@@ -478,6 +505,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
+                        onEdit={handleUpdateRecord}
                       />
                     </td>
 
@@ -547,39 +575,35 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                       />
                     </td>
 
-                    {/* Dreno (Single Input - Col 3) */}
+                    {/* Dreno (Multi-Item Sheet Drawer) */}
                     <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
-                      <SingleCellInput
+                      <MultiItemSheetCell
                         hour={hour}
                         category="DRAIN"
                         direction="OUTPUT"
-                        colIndex={3}
-                        rowIndex={rowIndex}
-                        existingRecord={drainRecord}
-                        isSaving={savingMap[`fluid-${hour}-DRAIN`]}
-                        isSuccess={successMap[`fluid-${hour}-DRAIN`]}
-                        isError={errorMap[`fluid-${hour}-DRAIN`]}
+                        title="Drenos"
+                        records={drainList}
                         isReadOnly={isReadOnlyShift}
-                        onSave={handleFluidCellSave}
-                        onKeyDown={handleKeyDown}
+                        volumeOptional
+                        onAdd={handleAddMultiItemRecord}
+                        onDelete={handleDeleteRecord}
+                        onEdit={handleUpdateRecord}
                       />
                     </td>
 
-                    {/* Fezes (Single Input - Col 4) */}
+                    {/* Fezes (Multi-Item Sheet Drawer) */}
                     <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
-                      <SingleCellInput
+                      <MultiItemSheetCell
                         hour={hour}
                         category="STOOL"
                         direction="OUTPUT"
-                        colIndex={4}
-                        rowIndex={rowIndex}
-                        existingRecord={stoolRecord}
-                        isSaving={savingMap[`fluid-${hour}-STOOL`]}
-                        isSuccess={successMap[`fluid-${hour}-STOOL`]}
-                        isError={errorMap[`fluid-${hour}-STOOL`]}
+                        title="Fezes"
+                        records={stoolList}
                         isReadOnly={isReadOnlyShift}
-                        onSave={handleFluidCellSave}
-                        onKeyDown={handleKeyDown}
+                        volumeOptional
+                        onAdd={handleAddMultiItemRecord}
+                        onDelete={handleDeleteRecord}
+                        onEdit={handleUpdateRecord}
                       />
                     </td>
 
@@ -594,6 +618,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
+                        onEdit={handleUpdateRecord}
                       />
                     </td>
                   </tr>
@@ -602,7 +627,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
             </tbody>
 
             {/* Totals Footer Row */}
-            <tfoot>
+            <tfoot className="print:break-before-avoid">
               <tr className="border-t-2 border-slate-200 bg-slate-100 font-mono font-bold text-[12px] text-slate-900 print:bg-slate-100 print:text-black print:border-black">
                 <td className="p-1 text-center text-slate-700 border-r border-slate-200 print:border-black">
                   TOTAIS
@@ -691,7 +716,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       </div>
 
       {/* Official Nursing Signature and Stamp Footer for Paper Printouts */}
-      <div className="hidden print:block print:break-inside-avoid mt-8 pt-4 border-t border-black text-black">
+      <div className="hidden print:block print-signature print:mt-3 print:pt-2 mt-8 pt-4 border-t border-black text-black">
         <div className="flex justify-between items-end text-[10px]">
           <div className="space-y-1">
             <p><strong>Responsável Técnico:</strong> {currentUser?.full_name ?? currentUser?.name ?? "Profissional Não Identificado"}</p>
