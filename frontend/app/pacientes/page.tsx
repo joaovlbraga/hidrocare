@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { UserRoundPlus, Info, UserX, AlertTriangle } from "lucide-react";
@@ -11,13 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api";
 
 const patientSchema = z.object({
   medical_record: z.string().min(1, "Prontuário é obrigatório").max(60, "Prontuário excede 60 caracteres"),
-  bed: z.string().min(1, "Leito é obrigatório").max(30, "Leito excede 30 caracteres"),
+  uti: z.enum(["UTI 1", "UTI 2"], { required_error: "Unidade UTI é obrigatória" }),
+  bed: z.string().min(1, "Leito é obrigatório").max(50, "Leito excede 50 caracteres"),
   health_insurance: z.string().min(1, "Convênio é obrigatório").max(100, "Convênio excede 100 caracteres"),
   full_name: z.string().min(3, "Nome completo deve ter pelo menos 3 caracteres").max(150, "Nome excede 150 caracteres"),
   birth_date: z.string().min(1, "Data de nascimento é obrigatória"),
@@ -28,6 +30,7 @@ type PatientFormData = z.infer<typeof patientSchema>;
 type Patient = {
   id: number;
   full_name: string;
+  uti?: string;
   bed: string;
   medical_record: string;
   health_insurance?: string;
@@ -45,11 +48,13 @@ export default function PatientsPage() {
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
+      uti: "UTI 1",
       health_insurance: "SUS",
     },
   });
@@ -72,7 +77,7 @@ export default function PatientsPage() {
     setSaving(true);
     try {
       await apiFetch("/patients", { method: "POST", body: JSON.stringify(data) });
-      reset({ health_insurance: "SUS" });
+      reset({ uti: "UTI 1", health_insurance: "SUS", medical_record: "", bed: "", full_name: "", birth_date: "" });
       setMessage({ text: "Paciente cadastrado com sucesso.", ok: true });
       await loadPatients();
     } catch (error) {
@@ -111,10 +116,13 @@ export default function PatientsPage() {
       <CardContent className="space-y-3 text-xs text-slate-600 leading-relaxed">
         <p>O número do prontuário é o identificador clínico do paciente no sistema.</p>
         <p>
+          Selecione a unidade de terapia intensiva (<strong>UTI 1</strong> ou <strong>UTI 2</strong>) e o número/código do leito (ex.: 01, 02, A1, Isolamento).
+        </p>
+        <p>
           O convênio registra a cobertura assistencial do paciente (ex.: SUS, Bradesco, Unimed, etc.).
         </p>
         <p>
-          A remoção de paciente opera via <strong>Soft Delete</strong>: o paciente é retirado da lista ativa do painel assistencial, mas todo o histórico de balanço hídrico é preservado no banco para futuras auditorias e relatórios.
+          A remoção de paciente opera via <strong>Soft Delete</strong>: o paciente é retirado da lista ativa do painel assistencial, mas todo o histórico de balanço hídrico é preservado para auditoria.
         </p>
       </CardContent>
     </Card>
@@ -125,21 +133,40 @@ export default function PatientsPage() {
       <div className="space-y-8">
         <FormPanel
           title="Cadastrar paciente"
-          description="Cadastre o paciente e seu leito para permitir o monitoramento e o registro hídrico assistencial."
+          description="Cadastre o paciente, sua unidade UTI e o leito para permitir o monitoramento e o registro hídrico assistencial."
           aside={asideContent}
         >
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4 pb-4 border-b border-slate-100">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">1. Leito e Identificação Hospitalar</h2>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <Label htmlFor="medical_record">Prontuário</Label>
                   <Input id="medical_record" {...register("medical_record")} className="mt-1.5" placeholder="Ex.: PR-89234" />
                   {errors.medical_record && <p className="mt-1 text-xs text-red-600">{errors.medical_record.message}</p>}
                 </div>
                 <div>
+                  <Label htmlFor="uti">Unidade UTI</Label>
+                  <Controller
+                    control={control}
+                    name="uti"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="uti" className="mt-1.5 h-9 text-xs">
+                          <SelectValue placeholder="Selecione a UTI" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UTI 1">UTI 1</SelectItem>
+                          <SelectItem value="UTI 2">UTI 2</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.uti && <p className="mt-1 text-xs text-red-600">{errors.uti.message}</p>}
+                </div>
+                <div>
                   <Label htmlFor="bed">Leito</Label>
-                  <Input id="bed" {...register("bed")} className="mt-1.5" placeholder="Ex.: UTI 01" />
+                  <Input id="bed" {...register("bed")} className="mt-1.5" placeholder="Ex.: 01" />
                   {errors.bed && <p className="mt-1 text-xs text-red-600">{errors.bed.message}</p>}
                 </div>
                 <div>
@@ -195,7 +222,8 @@ export default function PatientsPage() {
                     <div>
                       <p className="font-semibold text-slate-900">{patient.full_name}</p>
                       <p className="text-xs text-slate-500">
-                        Leito: <span className="font-medium text-slate-700">{patient.bed}</span> · Prontuário:{" "}
+                        Unidade: <span className="font-medium text-slate-800">{patient.uti || "UTI 1"}</span> · Leito:{" "}
+                        <span className="font-medium text-slate-800">{patient.bed}</span> · Prontuário:{" "}
                         <span className="font-medium text-slate-700">{patient.medical_record}</span> · Convênio:{" "}
                         <span className="font-medium text-slate-700">{patient.health_insurance || "SUS"}</span>
                       </p>
@@ -229,7 +257,7 @@ export default function PatientsPage() {
               <h3 className="text-lg font-semibold text-slate-900">Confirmar Remoção de Paciente</h3>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Tem certeza que deseja dar alta / remover o paciente <strong className="text-slate-900">{confirmPatient.full_name}</strong> (Leito {confirmPatient.bed}, Prontuário {confirmPatient.medical_record})?
+              Tem certeza que deseja dar alta / remover o paciente <strong className="text-slate-900">{confirmPatient.full_name}</strong> ({confirmPatient.uti || "UTI 1"} — Leito {confirmPatient.bed}, Prontuário {confirmPatient.medical_record})?
             </p>
             <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
               ℹ️ O paciente será arquivado do painel ativo (Soft Delete). Todo o histórico de balanço hídrico permanece intacto no banco de dados.

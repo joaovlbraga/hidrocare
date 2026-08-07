@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -34,8 +35,35 @@ class PatientCreate(BaseModel):
     medical_record: str = Field(min_length=1, max_length=60)
     full_name: str = Field(min_length=3, max_length=150)
     birth_date: date
-    bed: str = Field(min_length=1, max_length=30)
+    uti: Literal["UTI 1", "UTI 2"] = Field(default="UTI 1")
+    bed: str = Field(min_length=1, max_length=50)
     health_insurance: str = Field(default="SUS", min_length=1, max_length=100)
+
+    @field_validator("bed", mode="before")
+    @classmethod
+    def validate_bed(cls, v: str) -> str:
+        s = str(v).strip()
+        if not s:
+            raise ValueError("Leito não pode ser vazio")
+        return s
+
+
+class PatientUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=3, max_length=150)
+    birth_date: date | None = Field(default=None)
+    uti: Literal["UTI 1", "UTI 2"] | None = Field(default=None)
+    bed: str | None = Field(default=None, min_length=1, max_length=50)
+    health_insurance: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @field_validator("bed", mode="before")
+    @classmethod
+    def validate_bed_update(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            raise ValueError("Leito não pode ser vazio")
+        return s
 
 
 class PatientPublic(PatientCreate):
@@ -107,6 +135,7 @@ class FluidRecordPublic(BaseModel):
     id: int
     patient_id: int
     registered_by_id: int
+    updated_by_id: int | None = None
     direction: FluidDirection
     category: FluidType
     volume_ml: float | str | None = None
@@ -114,6 +143,7 @@ class FluidRecordPublic(BaseModel):
     occurred_at: datetime
     notes: str | None
     created_at: datetime
+    updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
@@ -131,6 +161,7 @@ class FluidRecordPublic(BaseModel):
                     "id": data.id,
                     "patient_id": data.patient_id,
                     "registered_by_id": data.registered_by_id,
+                    "updated_by_id": getattr(data, "updated_by_id", None),
                     "direction": data.direction,
                     "category": data.category,
                     "volume_ml": formatted_vol,
@@ -138,12 +169,14 @@ class FluidRecordPublic(BaseModel):
                     "occurred_at": data.occurred_at,
                     "notes": data.notes,
                     "created_at": data.created_at,
+                    "updated_at": getattr(data, "updated_at", None),
                 }
             elif qual:
                 return {
                     "id": data.id,
                     "patient_id": data.patient_id,
                     "registered_by_id": data.registered_by_id,
+                    "updated_by_id": getattr(data, "updated_by_id", None),
                     "direction": data.direction,
                     "category": data.category,
                     "volume_ml": qual,
@@ -151,6 +184,7 @@ class FluidRecordPublic(BaseModel):
                     "occurred_at": data.occurred_at,
                     "notes": data.notes,
                     "created_at": data.created_at,
+                    "updated_at": getattr(data, "updated_at", None),
                 }
         return data
 
@@ -177,8 +211,10 @@ class VitalSignPublic(VitalSignBase):
     id: int
     patient_id: int
     registered_by_id: int
+    updated_by_id: int | None = None
     occurred_at: datetime
     created_at: datetime
+    updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

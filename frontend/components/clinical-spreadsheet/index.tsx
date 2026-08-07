@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { FluidRecord, DailySpreadsheetPayload } from "./types";
+import { FluidRecord, DailySpreadsheetPayload, CurrentUser } from "./types";
 import { SingleCellInput } from "./single-cell-input";
 import { MultiItemSheetCell } from "./multi-item-sheet-cell";
 import { NutritionSheetCell } from "./nutrition-sheet-cell";
@@ -38,13 +38,18 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
   const [fluids, setFluids] = useState<FluidRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [cumulativeBalance, setCumulativeBalance] = useState<number | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ full_name?: string; name?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  // Autosave status maps
+  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
+  const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
+  const [errorMap, setErrorMap] = useState<Record<string, boolean>>({});
 
   // Fetch authenticated user
   useEffect(() => {
     let active = true;
     apiFetch("/auth/me")
-      .then((u: { full_name?: string; name?: string }) => {
+      .then((u: CurrentUser) => {
         if (active && u) setCurrentUser(u);
       })
       .catch(() => {
@@ -55,15 +60,18 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
     };
   }, []);
 
-  // Autosave status maps
-  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
-  const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
-  const [errorMap, setErrorMap] = useState<Record<string, boolean>>({});
+  // Derived: is the targetDate shift already closed?
+  // The shift for targetDate closes once wall clock >= 07:00 on targetDate+1.
+  const isReadOnlyShift = useMemo(() => {
+    if (currentUser?.role === "ADMIN") return false;
+    const nextDay = getNextDay(targetDate);
+    const shiftEnd = new Date(`${nextDay}T07:00:00`);
+    return new Date() >= shiftEnd;
+  }, [targetDate, currentUser?.role]);
 
   // Fetch daily fluids data
-  useEffect(() => {
+  const loadFluidsData = useCallback(() => {
     let active = true;
-    setLoading(true);
     apiFetch(`/balances/patients/${patientId}/records?target_date=${targetDate}`)
       .then((data: DailySpreadsheetPayload | FluidRecord[]) => {
         if (!active) return;
@@ -80,14 +88,18 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
           setLoading(false);
         }
       });
-
     return () => {
       active = false;
     };
   }, [patientId, targetDate]);
 
-  // Fetch daily balance (including cumulative balance)
   useEffect(() => {
+    setLoading(true);
+    return loadFluidsData();
+  }, [loadFluidsData]);
+
+  // Fetch daily balance (including cumulative balance)
+  const refreshDailyBalance = useCallback(() => {
     let active = true;
     apiFetch(`/balances/patients/${patientId}/daily?target_date=${targetDate}`)
       .then((res: { cumulative_balance?: number }) => {
@@ -99,11 +111,14 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       .catch(() => {
         if (active) setCumulativeBalance(null);
       });
-
     return () => {
       active = false;
     };
-  }, [patientId, targetDate, fluids]);
+  }, [patientId, targetDate]);
+
+  useEffect(() => {
+    return refreshDailyBalance();
+  }, [refreshDailyBalance, fluids]);
 
   // Index map to eliminate linear array filters across 216 cells
   const fluidsByHourCategoryMap = useMemo(() => {
@@ -135,6 +150,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       valString: string
     ) => {
       const cellKey = `fluid-${hour}-${category}`;
+      if (savingMap[cellKey]) return;
       const occurredAt = getOccurredAt(targetDate, hour);
       const existingList = fluidsByHourCategoryMap.get(`${hour}-${category}`) || [];
       const existingRecord = existingList[0];
@@ -144,7 +160,9 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       const existingValStr = existingRecord
         ? existingRecord.qualitative_value
           ? existingRecord.qualitative_value
-          : String(existingRecord.volume_ml ?? "")
+          : existingRecord.volume_ml !== null && existingRecord.volume_ml !== undefined
+          ? String(existingRecord.volume_ml)
+          : ""
         : "";
 
       if (existingRecord && existingValStr === trimmed) return;
@@ -159,61 +177,74 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       setSavingMap((prev) => ({ ...prev, [cellKey]: true }));
 
       try {
-        if (trimmed === "" || trimmed === "0") {
+        if (trimmed === "") {
           if (existingRecord) {
             await apiFetch(`/balances/records/${existingRecord.id}`, { method: "DELETE" });
             setFluids((prev) => prev.filter((r) => r.id !== existingRecord.id));
+            triggerSuccess(cellKey);
           }
-        } else if (existingRecord) {
-          const res = await apiFetch(`/balances/records/${existingRecord.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ volume_ml: trimmed }),
-          });
-          setFluids((prev) =>
-            prev.map((r) =>
-              r.id === existingRecord.id
-                ? {
-                    ...r,
-                    volume_ml: res.volume_ml !== undefined ? res.volume_ml : trimmed,
-                    qualitative_value: res.qualitative_value ?? (Number.isNaN(Number(trimmed)) ? trimmed : null),
-                  }
-                : r
-            )
-          );
-          triggerSuccess(cellKey);
         } else {
-          const res = await apiFetch("/balances/records", {
-            method: "POST",
-            body: JSON.stringify({
+          const num = parseFloat(trimmed);
+          const isQual = Number.isNaN(num);
+          const parsedVol = isQual ? null : num;
+          const parsedQual = isQual ? trimmed : null;
+
+          if (existingRecord) {
+            const res = await apiFetch(`/balances/records/${existingRecord.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ volume_ml: trimmed }),
+            });
+            const updatedVol = res.volume_ml !== undefined && res.volume_ml !== null ? (typeof res.volume_ml === "number" ? res.volume_ml : parseFloat(String(res.volume_ml))) : parsedVol;
+            const updatedQual = res.qualitative_value !== undefined ? res.qualitative_value : parsedQual;
+
+            setFluids((prev) =>
+              prev.map((r) =>
+                r.id === existingRecord.id
+                  ? {
+                      ...r,
+                      volume_ml: Number.isFinite(updatedVol) ? updatedVol : null,
+                      qualitative_value: updatedQual,
+                    }
+                  : r
+              )
+            );
+            triggerSuccess(cellKey);
+          } else {
+            const res = await apiFetch("/balances/records", {
+              method: "POST",
+              body: JSON.stringify({
+                patient_id: patientId,
+                direction,
+                category,
+                volume_ml: trimmed,
+                occurred_at: occurredAt,
+              }),
+            });
+
+            const createdRecord: FluidRecord = {
+              id: res.id,
               patient_id: patientId,
+              registered_by_id: 0,
               direction,
               category,
-              volume_ml: trimmed,
+              volume_ml: parsedVol,
+              qualitative_value: parsedQual,
               occurred_at: occurredAt,
-            }),
-          });
-          const createdRecord: FluidRecord = {
-            id: res.id,
-            patient_id: patientId,
-            registered_by_id: 0,
-            direction,
-            category,
-            volume_ml: Number.isNaN(Number(trimmed)) ? null : parseFloat(trimmed),
-            qualitative_value: Number.isNaN(Number(trimmed)) ? trimmed : null,
-            occurred_at: occurredAt,
-            notes: null,
-            created_at: new Date().toISOString(),
-          };
-          setFluids((prev) => [...prev, createdRecord]);
-          triggerSuccess(cellKey);
+              notes: null,
+              created_at: new Date().toISOString(),
+            };
+            setFluids((prev) => [...prev, createdRecord]);
+            triggerSuccess(cellKey);
+          }
         }
+        refreshDailyBalance();
       } catch {
         setErrorMap((prev) => ({ ...prev, [cellKey]: true }));
       } finally {
         setSavingMap((prev) => ({ ...prev, [cellKey]: false }));
       }
     },
-    [fluidsByHourCategoryMap, patientId, targetDate, triggerSuccess]
+    [fluidsByHourCategoryMap, patientId, targetDate, triggerSuccess, refreshDailyBalance, savingMap]
   );
 
   const handleAddMultiItemRecord = useCallback(
@@ -248,8 +279,9 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
         created_at: new Date().toISOString(),
       };
       setFluids((prev) => [...prev, createdRecord]);
+      refreshDailyBalance();
     },
-    [patientId, targetDate]
+    [patientId, targetDate, refreshDailyBalance]
   );
 
   const handleAddNutritionRecord = useCallback(
@@ -283,14 +315,19 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
         created_at: new Date().toISOString(),
       };
       setFluids((prev) => [...prev, createdRecord]);
+      refreshDailyBalance();
     },
-    [patientId, targetDate]
+    [patientId, targetDate, refreshDailyBalance]
   );
 
-  const handleDeleteRecord = useCallback(async (recordId: number) => {
-    await apiFetch(`/balances/records/${recordId}`, { method: "DELETE" });
-    setFluids((prev) => prev.filter((r) => r.id !== recordId));
-  }, []);
+  const handleDeleteRecord = useCallback(
+    async (recordId: number) => {
+      await apiFetch(`/balances/records/${recordId}`, { method: "DELETE" });
+      setFluids((prev) => prev.filter((r) => r.id !== recordId));
+      refreshDailyBalance();
+    },
+    [refreshDailyBalance]
+  );
 
   // Keyboard Navigation across 6 single fluid columns
   const handleKeyDown = useCallback(
@@ -334,7 +371,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
     let totalOutputs = 0;
 
     for (const r of fluids) {
-      const rawVal = String(r.volume_ml ?? "").trim();
+      const rawVal = r.volume_ml !== null && r.volume_ml !== undefined ? String(r.volume_ml).trim() : "";
       const parsed = parseFloat(rawVal);
       const safeVal = Number.isFinite(parsed) ? parsed : 0;
 
@@ -424,6 +461,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="INPUT"
                         title="Medicações & Infusões"
                         records={medsList}
+                        isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
                       />
@@ -437,6 +475,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="INPUT"
                         title="Outras Entradas Hídricas"
                         records={otherInputList}
+                        isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
                       />
@@ -447,6 +486,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                       <NutritionSheetCell
                         hour={hour}
                         records={nutritionList}
+                        isReadOnly={isReadOnlyShift}
                         onAdd={handleAddNutritionRecord}
                         onDelete={handleDeleteRecord}
                       />
@@ -464,6 +504,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isSaving={savingMap[`fluid-${hour}-IV_HYDRATION`]}
                         isSuccess={successMap[`fluid-${hour}-IV_HYDRATION`]}
                         isError={errorMap[`fluid-${hour}-IV_HYDRATION`]}
+                        isReadOnly={isReadOnlyShift}
                         onSave={handleFluidCellSave}
                         onKeyDown={handleKeyDown}
                       />
@@ -482,6 +523,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isSaving={savingMap[`fluid-${hour}-URINE`]}
                         isSuccess={successMap[`fluid-${hour}-URINE`]}
                         isError={errorMap[`fluid-${hour}-URINE`]}
+                        isReadOnly={isReadOnlyShift}
                         onSave={handleFluidCellSave}
                         onKeyDown={handleKeyDown}
                       />
@@ -499,6 +541,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isSaving={savingMap[`fluid-${hour}-SNE_SNG`]}
                         isSuccess={successMap[`fluid-${hour}-SNE_SNG`]}
                         isError={errorMap[`fluid-${hour}-SNE_SNG`]}
+                        isReadOnly={isReadOnlyShift}
                         onSave={handleFluidCellSave}
                         onKeyDown={handleKeyDown}
                       />
@@ -516,6 +559,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isSaving={savingMap[`fluid-${hour}-DRAIN`]}
                         isSuccess={successMap[`fluid-${hour}-DRAIN`]}
                         isError={errorMap[`fluid-${hour}-DRAIN`]}
+                        isReadOnly={isReadOnlyShift}
                         onSave={handleFluidCellSave}
                         onKeyDown={handleKeyDown}
                       />
@@ -533,6 +577,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         isSaving={savingMap[`fluid-${hour}-STOOL`]}
                         isSuccess={successMap[`fluid-${hour}-STOOL`]}
                         isError={errorMap[`fluid-${hour}-STOOL`]}
+                        isReadOnly={isReadOnlyShift}
                         onSave={handleFluidCellSave}
                         onKeyDown={handleKeyDown}
                       />
@@ -546,6 +591,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="OUTPUT"
                         title="Outras Saídas / Drenagens"
                         records={otherOutputList}
+                        isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
                       />

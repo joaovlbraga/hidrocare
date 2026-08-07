@@ -38,6 +38,7 @@ describe("PatientsPage with Convênio", () => {
           method: "POST",
           body: JSON.stringify({
             medical_record: "REC123",
+            uti: "UTI 1",
             bed: "UTI 01",
             health_insurance: "Unimed",
             full_name: "João Silva",

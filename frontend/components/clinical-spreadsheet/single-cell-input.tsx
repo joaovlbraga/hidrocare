@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, KeyboardEvent } from "react";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FluidRecord } from "./types";
 
 export type SingleCellInputProps = {
@@ -15,6 +16,7 @@ export type SingleCellInputProps = {
   isSaving?: boolean;
   isSuccess?: boolean;
   isError?: boolean;
+  isReadOnly?: boolean;
   onSave: (hour: string, category: string, direction: "INPUT" | "OUTPUT", valString: string) => void;
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => void;
 };
@@ -29,6 +31,7 @@ export const SingleCellInput = React.memo(function SingleCellInput({
   isSaving,
   isSuccess,
   isError,
+  isReadOnly,
   onSave,
   onKeyDown,
 }: SingleCellInputProps) {
@@ -53,20 +56,22 @@ export const SingleCellInput = React.memo(function SingleCellInput({
         data-row={rowIndex}
         data-col={colIndex}
         value={val}
+        disabled={isReadOnly}
         onChange={(e) => setVal(e.target.value)}
-        onBlur={() => onSave(hour, category, direction, val)}
+        onBlur={() => !isReadOnly && onSave(hour, category, direction, val)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            onSave(hour, category, direction, val);
+            e.currentTarget.blur();
           }
           onKeyDown(e, rowIndex, colIndex);
         }}
         placeholder="—"
         className={cn(
           "h-7 w-full border-none bg-transparent text-center font-mono text-[12px] text-slate-900 transition-all focus:z-10 focus:bg-white focus:outline-none focus:ring-1 focus:ring-hospital-600 rounded-xs print:hidden",
+          isReadOnly && "cursor-not-allowed opacity-60 bg-slate-50",
           isError && "bg-red-50 text-red-900 font-bold focus:ring-red-600",
           isSuccess && "bg-emerald-50 text-emerald-900 font-bold",
-          val !== "" && !isError && !isSuccess && "font-semibold"
+          val !== "" && !isError && !isSuccess && !isReadOnly && "font-semibold"
         )}
       />
       <span className="hidden print:block font-mono text-[11px] text-black text-center">
@@ -78,12 +83,23 @@ export const SingleCellInput = React.memo(function SingleCellInput({
             : String(existingRecord.volume_ml ?? "—")
           : "—"}
       </span>
-      {isSaving && (
+      {isReadOnly && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Lock className="pointer-events-auto absolute right-0.5 h-2.5 w-2.5 text-slate-400 print:hidden cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
+            Plantão encerrado — somente administradores podem editar
+          </TooltipContent>
+        </Tooltip>
+      )}
+      {isSaving && !isReadOnly && (
         <Loader2 className="pointer-events-none absolute right-0.5 h-2.5 w-2.5 animate-spin text-hospital-600 print:hidden" />
       )}
-      {isSuccess && !isSaving && (
+      {isSuccess && !isSaving && !isReadOnly && (
         <Check className="pointer-events-none absolute right-0.5 h-2.5 w-2.5 text-emerald-600 print:hidden" />
       )}
     </div>
   );
 });
+

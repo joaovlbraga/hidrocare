@@ -1,8 +1,9 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, column, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import expression
 
 from app.database import Base
 
@@ -45,7 +46,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    records: Mapped[list["FluidRecord"]] = relationship(back_populates="registered_by")
+    records: Mapped[list["FluidRecord"]] = relationship(back_populates="registered_by", foreign_keys="FluidRecord.registered_by_id")
 
 
 class Patient(Base):
@@ -55,7 +56,8 @@ class Patient(Base):
     medical_record: Mapped[str] = mapped_column(String(60), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(150))
     birth_date: Mapped[date] = mapped_column(Date)
-    bed: Mapped[str] = mapped_column(String(30), index=True)
+    uti: Mapped[str] = mapped_column(String(50), nullable=False, server_default="UTI 1", index=True)
+    bed: Mapped[str] = mapped_column(String(50), nullable=False, server_default="01", index=True)
     health_insurance: Mapped[str] = mapped_column(String(100), default="SUS")
     is_admitted: Mapped[bool] = mapped_column(default=True)
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -67,11 +69,35 @@ class Patient(Base):
 
 class FluidRecord(Base):
     __tablename__ = "fluid_records"
-    __table_args__ = (Index("ix_fluid_patient_occurrence", "patient_id", "occurred_at"),)
+    __table_args__ = (
+        Index("ix_fluid_patient_occurrence", "patient_id", "occurred_at"),
+        Index(
+            "uq_fluid_single_value_category",
+            "patient_id",
+            "occurred_at",
+            "category",
+            unique=True,
+            postgresql_where=column("category").in_([
+                "IV_HYDRATION",
+                "URINE",
+                "SNE_SNG",
+                "DRAIN",
+                "STOOL",
+            ]),
+            sqlite_where=column("category").in_([
+                "IV_HYDRATION",
+                "URINE",
+                "SNE_SNG",
+                "DRAIN",
+                "STOOL",
+            ]),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
     registered_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     direction: Mapped[FluidDirection] = mapped_column(Enum(FluidDirection), nullable=False)
     category: Mapped[FluidType] = mapped_column(Enum(FluidType), nullable=False)
     volume_ml: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -79,9 +105,11 @@ class FluidRecord(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     patient: Mapped[Patient] = relationship(back_populates="records")
-    registered_by: Mapped[User] = relationship(back_populates="records")
+    registered_by: Mapped[User] = relationship(back_populates="records", foreign_keys=[registered_by_id])
+    updated_by: Mapped["User | None"] = relationship(foreign_keys=[updated_by_id])
 
 
 class VitalSignRecord(Base):
@@ -94,6 +122,7 @@ class VitalSignRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
     registered_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    updated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     pulse: Mapped[int | None] = mapped_column(Integer)
     blood_pressure: Mapped[str | None] = mapped_column(String(20))
@@ -102,6 +131,8 @@ class VitalSignRecord(Base):
     spo2: Mapped[int | None] = mapped_column(Integer)
     hgt: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     patient: Mapped[Patient] = relationship(back_populates="vital_signs")
-    registered_by: Mapped[User] = relationship()
+    registered_by: Mapped[User] = relationship(foreign_keys=[registered_by_id])
+    updated_by: Mapped["User | None"] = relationship(foreign_keys=[updated_by_id])

@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api";
 type Patient = {
   id: number;
   full_name: string;
+  uti?: string;
   bed: string;
   medical_record: string;
   health_insurance?: string;
@@ -71,7 +72,7 @@ export default function RecordsPage() {
                   <SelectContent>
                     {(patients ?? []).map((patient) => (
                       <SelectItem key={patient.id} value={String(patient.id)} className="text-xs">
-                        Leito {patient.bed} — {patient.full_name} ({patient.medical_record})
+                        {patient.uti || "UTI 1"} — Leito {patient.bed} · {patient.full_name} ({patient.medical_record})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -97,7 +98,7 @@ export default function RecordsPage() {
                 <User className="h-3.5 w-3.5 text-hospital-700 shrink-0" />
                 <span className="font-bold text-slate-900 truncate max-w-[180px]">{activePatient.full_name}</span>
                 <span className="text-slate-400">·</span>
-                <span className="text-slate-600 font-mono">Leito {activePatient.bed}</span>
+                <span className="text-slate-600 font-mono">{activePatient.uti || "UTI 1"} · Leito {activePatient.bed}</span>
               </div>
             )}
 
@@ -127,8 +128,9 @@ export default function RecordsPage() {
                 <p><strong>Data do Plantão:</strong> {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
               </div>
             </div>
-            <div className="mt-2 grid grid-cols-4 gap-2 text-xs bg-slate-50 p-2 rounded border border-slate-300">
+            <div className="mt-2 grid grid-cols-5 gap-2 text-xs bg-slate-50 p-2 rounded border border-slate-300">
               <p><strong>Paciente:</strong> {activePatient.full_name}</p>
+              <p><strong>Unidade:</strong> {activePatient.uti || "UTI 1"}</p>
               <p><strong>Leito:</strong> {activePatient.bed}</p>
               <p><strong>Prontuário:</strong> {activePatient.medical_record}</p>
               <p><strong>Convênio:</strong> {activePatient.health_insurance || "SUS"}</p>

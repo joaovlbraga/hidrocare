@@ -1,5 +1,14 @@
 node_modules/
 .next/
-.venv/
+dist/
+coverage/
+playwright-report/
+test-results/
+.pytest_cache/
 __pycache__/
+*.pyc
+.venv/
+venv/
 .env
+.env.*
+.DS_Store

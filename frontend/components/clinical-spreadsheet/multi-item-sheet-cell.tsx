@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, Loader2, Pill } from "lucide-react";
+import { Plus, Trash2, Loader2, Pill, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,7 @@ export type MultiItemSheetCellProps = {
   direction: "INPUT" | "OUTPUT";
   title: string;
   records: FluidRecord[];
+  isReadOnly?: boolean;
   onAdd: (hour: string, category: string, direction: "INPUT" | "OUTPUT", volumeMl: number, notes: string) => Promise<void>;
   onDelete: (recordId: number) => Promise<void>;
 };
@@ -31,6 +33,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
   direction,
   title,
   records,
+  isReadOnly,
   onAdd,
   onDelete,
 }: MultiItemSheetCellProps) {
@@ -63,7 +66,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <div className="flex min-h-7 h-full w-full cursor-pointer items-center justify-center transition-colors hover:bg-slate-100/70 p-0.5 print:p-1 print:h-auto print:min-h-0 print:align-top">
+        <div className={cn("flex min-h-7 h-full w-full cursor-pointer items-center justify-center transition-colors hover:bg-slate-100/70 p-0.5 print:p-1 print:h-auto print:min-h-0 print:align-top", isReadOnly && "cursor-default")}>
           {records.length > 0 ? (
             <div className="flex items-center gap-1 text-slate-800 font-mono text-[11px] font-semibold print:hidden">
               <span>{totalVol} ml</span>
@@ -73,6 +76,16 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
             </div>
           ) : (
             <span className="text-slate-600 text-[11px] hover:text-slate-900 print:hidden">—</span>
+          )}
+          {isReadOnly && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Lock className="ml-0.5 h-2.5 w-2.5 text-slate-400 print:hidden cursor-help flex-shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
+                Plantão encerrado — somente administradores podem editar
+              </TooltipContent>
+            </Tooltip>
           )}
           <span className="hidden print:block font-mono text-[10px] text-black text-center print:whitespace-pre-wrap print:break-words print:overflow-visible print:max-w-none print:min-w-0 print-expand-text leading-tight">
             {printSummaryText}
@@ -90,35 +103,37 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleAddItem} className="mt-5 space-y-3.5 border-b pb-5">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Descrição / Nome do Medicamento</label>
-            <Input
-              placeholder="Ex: Noradrenalina 0.1 mcg/kg/min"
-              value={itemNotes}
-              onChange={(e) => setItemNotes(e.target.value)}
-              className="h-8 text-xs"
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Volume Infundido / Administrado (ml)</label>
-            <Input
-              type="number"
-              min="1"
-              max="5000"
-              placeholder="Ex: 50"
-              value={itemVol}
-              onChange={(e) => setItemVol(e.target.value)}
-              className="h-8 text-xs font-mono"
-              required
-            />
-          </div>
-          <Button type="submit" disabled={saving} className="w-full h-8 bg-hospital-600 hover:bg-hospital-700 text-xs font-semibold">
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-            Adicionar Lançamento
-          </Button>
-        </form>
+        {!isReadOnly && (
+          <form onSubmit={handleAddItem} className="mt-5 space-y-3.5 border-b pb-5">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">Descrição / Nome do Medicamento</label>
+              <Input
+                placeholder="Ex: Noradrenalina 0.1 mcg/kg/min"
+                value={itemNotes}
+                onChange={(e) => setItemNotes(e.target.value)}
+                className="h-8 text-xs"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">Volume Infundido / Administrado (ml)</label>
+              <Input
+                type="number"
+                min="1"
+                max="5000"
+                placeholder="Ex: 50"
+                value={itemVol}
+                onChange={(e) => setItemVol(e.target.value)}
+                className="h-8 text-xs font-mono"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={saving} className="w-full h-8 bg-hospital-600 hover:bg-hospital-700 text-xs font-semibold">
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+              Adicionar Lançamento
+            </Button>
+          </form>
+        )}
 
         <div className="mt-4 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b pb-2">
@@ -136,14 +151,16 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
                     <p className="font-semibold text-slate-800 truncate">{r.notes || "Sem descrição"}</p>
                     <p className="font-mono font-bold text-hospital-600 text-[11px]">{r.volume_ml} ml</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDelete(r.id)}
-                    className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {!isReadOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(r.id)}
+                      className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Droplets, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, TrendingUp, Users, Building2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge, StatusDot } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/api";
 
-type Patient = { id: number; full_name: string; bed: string; medical_record: string; is_admitted: boolean };
+type Patient = { id: number; full_name: string; uti?: string; bed: string; medical_record: string; is_admitted: boolean };
 type DailyBalance = { patient_id: number; date: string; input_ml: number; output_ml: number; balance_ml: number; status: string };
 type PatientBalance = Patient & { balance: DailyBalance | null };
 
@@ -40,9 +40,14 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function naturalSortBed(aBed: string, bBed: string): number {
+  return aBed.localeCompare(bBed, undefined, { numeric: true, sensitivity: "base" });
+}
+
 export default function DashboardPage() {
   const [patients, setPatients] = useState<PatientBalance[] | null>(null);
   const [error, setError] = useState("");
+  const [activeUtiTab, setActiveUtiTab] = useState<"UTI 1" | "UTI 2">("UTI 1");
 
   useEffect(() => {
     let cancelled = false;
@@ -78,35 +83,63 @@ export default function DashboardPage() {
 
   const loading = patients === null;
 
-  const sorted = useMemo(() => {
+  // Filter patients by active UTI tab and sort naturally by Bed
+  const filteredPatients = useMemo(() => {
     if (!patients) return [];
-    const rank = { critical: 0, warning: 1, stable: 2 } as const;
-    return [...patients].sort((a, b) => {
-      const sa = a.balance ? rank[severityOf(a.balance.balance_ml)] : 3;
-      const sb = b.balance ? rank[severityOf(b.balance.balance_ml)] : 3;
-      return sa - sb;
-    });
-  }, [patients]);
+    return patients
+      .filter((p) => (p.uti || "UTI 1") === activeUtiTab)
+      .sort((a, b) => naturalSortBed(a.bed, b.bed));
+  }, [patients, activeUtiTab]);
 
+  // Overall metrics and alerts across all monitored patients
   const withBalance = (patients ?? []).filter((p): p is PatientBalance & { balance: DailyBalance } => p.balance !== null);
   const alertsCount = withBalance.filter((p) => severityOf(p.balance.balance_ml) !== "stable").length;
   const averageBalance = withBalance.length
     ? Math.round(withBalance.reduce((sum, p) => sum + p.balance.balance_ml, 0) / withBalance.length)
     : 0;
 
-  const chartData = withBalance.map((p) => ({
-    label: p.bed,
-    entradas: p.balance.input_ml,
-    saidas: p.balance.output_ml,
-  }));
+  const chartData = filteredPatients
+    .filter((p): p is PatientBalance & { balance: DailyBalance } => p.balance !== null)
+    .map((p) => ({
+      label: `L.${p.bed}`,
+      entradas: p.balance.input_ml,
+      saidas: p.balance.output_ml,
+    }));
 
   return (
     <AppShell>
       <div className="space-y-6">
-        <PageHeader
-          title="Visão geral do plantão"
-          description={`Saldo hídrico acumulado de hoje · ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}`}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <PageHeader
+            title="Visão geral do plantão UTI"
+            description={`Acompanhamento assistencial por Unidade UTI · ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}`}
+          />
+
+          {/* UTI Tabs Selector */}
+          <div className="flex items-center rounded-lg bg-slate-200/70 p-1 text-xs font-semibold">
+            {(["UTI 1", "UTI 2"] as const).map((uti) => {
+              const count = (patients ?? []).filter((p) => (p.uti || "UTI 1") === uti).length;
+              return (
+                <button
+                  key={uti}
+                  type="button"
+                  onClick={() => setActiveUtiTab(uti)}
+                  className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 transition-all ${
+                    activeUtiTab === uti
+                      ? "bg-white text-hospital-800 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>{uti}</span>
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {error && <Alert variant="error">{error}</Alert>}
 
@@ -126,11 +159,11 @@ export default function DashboardPage() {
                     <Users className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Pacientes Monitorados</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Leitos Ativos em {activeUtiTab}</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-slate-900">{patients?.length ?? 0}</span>
+                      <span className="text-2xl font-bold text-slate-900">{filteredPatients.length}</span>
                       <span className="text-xs text-slate-500">
-                        {patients?.length === 0 ? "Nenhum internado" : `${alertsCount} requerem atenção`}
+                        {filteredPatients.length === 0 ? "Nenhum internado nesta UTI" : "Pacientes monitorados"}
                       </span>
                     </div>
                   </div>
@@ -141,12 +174,12 @@ export default function DashboardPage() {
                     <TrendingUp className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Saldo Médio (Hoje)</p>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Saldo Médio Global</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-2xl font-bold text-slate-900">
                         {withBalance.length ? formatMl(averageBalance) : "—"}
                       </span>
-                      <span className="text-xs text-slate-500">Com registros no plantão</span>
+                      <span className="text-xs text-slate-500">Com registros hoje</span>
                     </div>
                   </div>
                 </div>
@@ -161,7 +194,7 @@ export default function DashboardPage() {
                       <span className={`text-2xl font-bold ${alertsCount > 0 ? "text-status-critical-fg" : "text-slate-900"}`}>
                         {alertsCount}
                       </span>
-                      <span className="text-xs text-slate-500">Fora da faixa de referência</span>
+                      <span className="text-xs text-slate-500">Requerem atenção assistencial</span>
                     </div>
                   </div>
                 </div>
@@ -174,18 +207,18 @@ export default function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle>Entradas vs. Saídas por Leito</CardTitle>
-              <CardDescription>Comparativo do volume acumulado (ml) no plantão atual</CardDescription>
+              <CardTitle>Entradas vs. Saídas por Leito ({activeUtiTab})</CardTitle>
+              <CardDescription>Volume acumulado em 24h ordenado por leito na unidade {activeUtiTab}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <Skeleton className="h-72 w-full" />
               ) : chartData.length === 0 ? (
                 <div className="grid h-72 place-items-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500">
-                  Nenhum registro hídrico lançado hoje.
+                  Nenhum registro hídrico lançado para {activeUtiTab} hoje.
                 </div>
               ) : (
-                <div className="h-72" role="img" aria-label="Gráfico de barras comparando entradas e saídas por paciente hoje">
+                <div className="h-72" role="img" aria-label={`Gráfico de barras comparando entradas e saídas por leito na ${activeUtiTab}`}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -207,8 +240,8 @@ export default function DashboardPage() {
 
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Status Clínico dos Pacientes</CardTitle>
-              <CardDescription>Ordenado por prioridade de atenção assistencial</CardDescription>
+              <CardTitle>Pacientes na {activeUtiTab}</CardTitle>
+              <CardDescription>Agrupados por leito em ordem sequencial</CardDescription>
             </CardHeader>
             <CardContent className="pt-2">
               {loading ? (
@@ -217,35 +250,40 @@ export default function DashboardPage() {
                   <Skeleton className="h-14 w-full" />
                   <Skeleton className="h-14 w-full" />
                 </div>
-              ) : sorted.length === 0 ? (
+              ) : filteredPatients.length === 0 ? (
                 <div className="grid h-40 place-items-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500">
-                  Nenhum paciente internado no momento.
+                  Nenhum paciente cadastrado na {activeUtiTab}.
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-100">
-                  {sorted.map((patient) => {
+                  {filteredPatients.map((patient) => {
                     const severity = patient.balance ? severityOf(patient.balance.balance_ml) : null;
                     return (
                       <li key={patient.id} className="flex items-center justify-between gap-3 py-3.5">
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{patient.full_name}</p>
-                          <p className="text-xs text-slate-500">
-                            Leito: <span className="font-semibold text-slate-700">{patient.bed}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded bg-hospital-100/70 px-2 py-0.5 font-mono text-xs font-bold text-hospital-900 border border-hospital-200 shrink-0">
+                              {patient.uti || "UTI 1"} · Leito {patient.bed}
+                            </span>
+                          </div>
+                          <p className="truncate font-semibold text-slate-900 mt-1">{patient.full_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Prontuário: <span className="font-mono text-slate-700">{patient.medical_record}</span>
                             {patient.balance && (
                               <>
-                                {" · Saldo: "}
-                                <span className="font-medium text-slate-700">{formatMl(patient.balance.balance_ml)}</span>
+                                {" · 24h: "}
+                                <span className="font-semibold text-slate-800">{formatMl(patient.balance.balance_ml)}</span>
                               </>
                             )}
                           </p>
                         </div>
                         {severity ? (
-                          <Badge variant={severity}>
+                          <Badge variant={severity} className="shrink-0">
                             <StatusDot variant={severity} />
                             {severityLabel[severity]}
                           </Badge>
                         ) : (
-                          <Badge variant="neutral">Sem registro</Badge>
+                          <Badge variant="neutral" className="shrink-0">Sem registro</Badge>
                         )}
                       </li>
                     );

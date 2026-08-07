@@ -145,3 +145,49 @@ def test_qualitative_record_creation_and_daily_balance(client):
     assert daily_data["input_ml"] == 500
     assert daily_data["output_ml"] == 0
     assert daily_data["balance_ml"] == 500
+
+
+def test_patient_uti_bed_crud_and_filtering(client):
+    res1 = client.post(
+        "/api/v1/patients",
+        json={
+            "medical_record": "REC-UTI-1",
+            "full_name": "Paciente UTI Um",
+            "birth_date": "1995-01-01",
+            "uti": "UTI 1",
+            "bed": "03",
+        },
+    )
+    assert res1.status_code == 201
+    p1 = res1.json()
+    assert p1["uti"] == "UTI 1"
+    assert p1["bed"] == "03"
+
+    res2 = client.post(
+        "/api/v1/patients",
+        json={
+            "medical_record": "REC-UTI-2",
+            "full_name": "Paciente UTI Dois",
+            "birth_date": "1996-02-02",
+            "uti": "UTI 2",
+            "bed": "01",
+        },
+    )
+    assert res2.status_code == 201
+    p2 = res2.json()
+    assert p2["uti"] == "UTI 2"
+    assert p2["bed"] == "01"
+
+    # Filter by uti=UTI 2
+    res_filt = client.get("/api/v1/patients?uti=UTI%202")
+    assert res_filt.status_code == 200
+    p_list = res_filt.json()
+    assert len(p_list) == 1
+    assert p_list[0]["medical_record"] == "REC-UTI-2"
+
+    # Patch update patient 1 to bed 05
+    res_patch = client.patch(f"/api/v1/patients/{p1['id']}", json={"bed": "05", "uti": "UTI 2"})
+    assert res_patch.status_code == 200
+    assert res_patch.json()["bed"] == "05"
+    assert res_patch.json()["uti"] == "UTI 2"
+

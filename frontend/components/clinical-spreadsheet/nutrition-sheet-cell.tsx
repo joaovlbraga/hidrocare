@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, Loader2, Utensils } from "lucide-react";
+import { Plus, Trash2, Loader2, Utensils, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Sheet,
   SheetContent,
@@ -24,6 +25,7 @@ import { FluidRecord } from "./types";
 export type NutritionSheetCellProps = {
   hour: string;
   records: FluidRecord[];
+  isReadOnly?: boolean;
   onAdd: (hour: string, category: "ORAL_DIET" | "ENTERAL_DIET", volumeMl: number, notes: string) => Promise<void>;
   onDelete: (recordId: number) => Promise<void>;
 };
@@ -31,6 +33,7 @@ export type NutritionSheetCellProps = {
 export const NutritionSheetCell = React.memo(function NutritionSheetCell({
   hour,
   records,
+  isReadOnly,
   onAdd,
   onDelete,
 }: NutritionSheetCellProps) {
@@ -75,6 +78,16 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
           ) : (
             <span className="text-slate-600 text-[11px] hover:text-slate-900 print:hidden">—</span>
           )}
+          {isReadOnly && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Lock className="ml-0.5 h-2.5 w-2.5 text-slate-400 print:hidden cursor-help flex-shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
+                Plantão encerrado — somente administradores podem editar
+              </TooltipContent>
+            </Tooltip>
+          )}
           <span className="hidden print:block font-mono text-[10px] text-black text-center print:whitespace-pre-wrap print:break-words print:overflow-visible print:max-w-none print:min-w-0 print-expand-text leading-tight">
             {printSummaryText}
           </span>
@@ -91,49 +104,51 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleAddNutrition} className="mt-5 space-y-3.5 border-b pb-5">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Tipo de Dieta</label>
-            <Select value={dietType} onValueChange={(v) => setDietType(v as any)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ORAL_DIET" className="text-xs">Dieta Oral (VO)</SelectItem>
-                <SelectItem value="ENTERAL_DIET" className="text-xs">Dieta Enteral (SNE / SNG)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {!isReadOnly && (
+          <form onSubmit={handleAddNutrition} className="mt-5 space-y-3.5 border-b pb-5">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">Tipo de Dieta</label>
+              <Select value={dietType} onValueChange={(v) => setDietType(v as any)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ORAL_DIET" className="text-xs">Dieta Oral (VO)</SelectItem>
+                  <SelectItem value="ENTERAL_DIET" className="text-xs">Dieta Enteral (SNE / SNG)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Volume (ml)</label>
-            <Input
-              type="number"
-              min="1"
-              max="3000"
-              placeholder="Ex: 200"
-              value={itemVol}
-              onChange={(e) => setItemVol(e.target.value)}
-              className="h-8 text-xs font-mono"
-              required
-            />
-          </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">Volume (ml)</label>
+              <Input
+                type="number"
+                min="1"
+                max="3000"
+                placeholder="Ex: 200"
+                value={itemVol}
+                onChange={(e) => setItemVol(e.target.value)}
+                className="h-8 text-xs font-mono"
+                required
+              />
+            </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Observação / Aceitação (Opcional)</label>
-            <Input
-              placeholder="Ex: Boa aceitação oral 80%"
-              value={itemNotes}
-              onChange={(e) => setItemNotes(e.target.value)}
-              className="h-8 text-xs"
-            />
-          </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">Observação / Aceitação (Opcional)</label>
+              <Input
+                placeholder="Ex: Boa aceitação oral 80%"
+                value={itemNotes}
+                onChange={(e) => setItemNotes(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
 
-          <Button type="submit" disabled={saving} className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white">
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-            Registrar Dieta
-          </Button>
-        </form>
+            <Button type="submit" disabled={saving} className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white">
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+              Registrar Dieta
+            </Button>
+          </form>
+        )}
 
         <div className="mt-4 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-700 border-b pb-2">
@@ -156,14 +171,16 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
                     </div>
                     {r.notes && <p className="text-[11px] text-slate-600 truncate">{r.notes}</p>}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDelete(r.id)}
-                    className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {!isReadOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(r.id)}
+                      className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

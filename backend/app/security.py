@@ -46,3 +46,19 @@ def require_roles(*allowed_roles: UserRole):
             raise HTTPException(status_code=403, detail="Sem permissão para esta ação")
         return current_user
     return dependency
+
+
+def assert_can_mutate_record(occurred_at: "datetime", current_user: User) -> None:
+    """Raises HTTP 403 if the shift containing occurred_at is closed and the user is not ADMIN.
+
+    Import is deferred inside the function to avoid a circular import between
+    security.py and utils/time_windows.py.
+    """
+    from app.utils.time_windows import is_shift_closed  # local import avoids circular deps
+
+    if current_user.role != UserRole.ADMIN and is_shift_closed(occurred_at):
+        raise HTTPException(
+            status_code=403,
+            detail="Não é possível editar dados de um plantão já encerrado. Solicite auditoria de um administrador.",
+        )
+
