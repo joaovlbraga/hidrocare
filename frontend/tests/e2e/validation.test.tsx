@@ -14,7 +14,7 @@ describe("UAT E2E: Hostile Input UI Validation", () => {
 
   it("handles emojis and qualitative symbols in cell inputs cleanly without crashes", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "CLINICAL" });
+      if (url === "/auth/me") return Promise.resolve({ username: "test.user", role: "CLINICAL" });
       if (url === "/patients") {
         return Promise.resolve([
           { id: 1, full_name: "Paciente Hostil UI", bed: "UTI 04", medical_record: "REC-HOST-UI" },

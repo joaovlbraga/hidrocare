@@ -29,7 +29,7 @@ export default function UsersPage() {
     try {
       await apiFetch("/auth/users", {
         method: "POST",
-        body: JSON.stringify({ full_name: data.get("full_name"), email: data.get("email"), password, role }),
+        body: JSON.stringify({ username: data.get("username"), full_name: data.get("full_name"), email: data.get("email"), password, role }),
       });
       form.reset();
       setRole("CLINICAL");
@@ -77,6 +77,11 @@ export default function UsersPage() {
             <div>
               <Label htmlFor="full_name">Nome completo</Label>
               <Input id="full_name" required name="full_name" className="mt-1.5" placeholder="Nome completo do profissional" />
+            </div>
+
+            <div>
+              <Label htmlFor="username">Usuário</Label>
+              <Input id="username" required name="username" className="mt-1.5" placeholder="usuario.sobrenome" />
             </div>
 
             <div>

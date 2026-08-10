@@ -45,6 +45,7 @@ def setup_test_db():
     db = TestingSessionLocal()
     admin_user = User(
         id=1,
+        username="admin",
         full_name="Admin Test",
         email="admin@hospital.com",
         password_hash="fakehash",

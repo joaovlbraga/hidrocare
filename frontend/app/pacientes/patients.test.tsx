@@ -14,7 +14,7 @@ describe("PatientsPage with Convênio", () => {
 
   it("submits patient form including health insurance field", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "ADMIN" });
+      if (url === "/auth/me") return Promise.resolve({ username: "admin", role: "ADMIN" });
       if (url === "/patients") return Promise.resolve([]);
       return Promise.resolve({});
     });
@@ -56,7 +56,7 @@ describe("PatientsPage with Convênio", () => {
     ];
 
     (apiFetch as any).mockImplementation((url: string, init?: any) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "ADMIN" });
+      if (url === "/auth/me") return Promise.resolve({ username: "admin", role: "ADMIN" });
       if (url === "/patients" && (!init || !init.method || init.method === "GET")) {
         return Promise.resolve(mockPatients);
       }

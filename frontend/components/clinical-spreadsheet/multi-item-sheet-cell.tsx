@@ -183,7 +183,45 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
                 onChange={(e) => setItemNotes(e.target.value)}
                 className="h-8 text-xs"
                 required={volumeOptional}
+                list={category === "MEDICATION" ? "medication-list" : undefined}
               />
+              {category === "MEDICATION" && (
+                <datalist id="medication-list">
+                  <option value="Adrenalina" />
+                  <option value="Amiodarona" />
+                  <option value="Ceftriaxona" />
+                  <option value="Cefepime" />
+                  <option value="Dexmedetomidina (Precedex)" />
+                  <option value="Diazepam" />
+                  <option value="Dipirona" />
+                  <option value="Dobutamina" />
+                  <option value="Dopamina" />
+                  <option value="Fentanil" />
+                  <option value="Haloperidol" />
+                  <option value="Heparina" />
+                  <option value="Insulina Regular" />
+                  <option value="Ketamina" />
+                  <option value="Meropenem" />
+                  <option value="Midazolam" />
+                  <option value="Milrinona" />
+                  <option value="Morfina" />
+                  <option value="Nitroglicerina (Tridil)" />
+                  <option value="Nitroprussiato (Nipride)" />
+                  <option value="Noradrenalina" />
+                  <option value="Omeprazol" />
+                  <option value="Ondansetrona" />
+                  <option value="Piperacilina + Tazobactam (Tazocin)" />
+                  <option value="Plasmalyte" />
+                  <option value="Propofol" />
+                  <option value="Ringer Lactato" />
+                  <option value="Rocurônio" />
+                  <option value="Soro Fisiológico 0.9%" />
+                  <option value="Soro Glicosado 5%" />
+                  <option value="Succinilcolina" />
+                  <option value="Tramadol" />
+                  <option value="Vasopressina" />
+                </datalist>
+              )}
             </div>
 
             <div className="space-y-1">

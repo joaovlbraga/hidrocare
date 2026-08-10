@@ -14,7 +14,7 @@ describe("UAT E2E: Fluid Balance Calculation & Qualitative Values", () => {
 
   it("calculates balance correctly with Medication=100 and Diuresis=+++ (Total=100)", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "CLINICAL" });
+      if (url === "/auth/me") return Promise.resolve({ username: "test.user", role: "CLINICAL" });
       if (url === "/patients") {
         return Promise.resolve([
           { id: 1, full_name: "Paciente UAT 1", bed: "UTI 01", medical_record: "REC-UAT-01" },

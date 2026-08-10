@@ -3,14 +3,14 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { Activity, ShieldCheck, Droplets, LockKeyhole, Mail } from "lucide-react";
+import { Activity, ShieldCheck, Droplets, LockKeyhole, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 
 const loginSchema = z.object({
-  email: z.string().email("Informe um e-mail válido"),
+  username: z.string().min(3, "Informe seu usuário"),
   password: z.string().min(8, "A senha deve ter ao menos 8 caracteres"),
 });
 
@@ -23,7 +23,7 @@ export default function LoginPage() {
     event.preventDefault();
     setError("");
     const form = new FormData(event.currentTarget);
-    const parsed = loginSchema.safeParse({ email: form.get("email"), password: form.get("password") });
+    const parsed = loginSchema.safeParse({ username: form.get("username"), password: form.get("password") });
     if (!parsed.success) return setError(parsed.error.issues[0].message);
 
     setLoading(true);
@@ -33,7 +33,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      if (!response.ok) throw new Error("E-mail ou senha inválidos");
+      if (!response.ok) throw new Error("Usuário ou senha inválidos");
       const { access_token } = await response.json();
       sessionStorage.setItem("access_token", access_token);
       router.push("/");
@@ -83,17 +83,17 @@ export default function LoginPage() {
 
           <form onSubmit={submit} className="space-y-5" noValidate>
             <div>
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="username">Usuário</Label>
               <div className="relative mt-1">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                 <Input
-                  id="email"
+                  id="username"
                   required
-                  name="email"
-                  type="email"
-                  autoComplete="email"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
                   className="pl-9"
-                  placeholder="profissional@hospital.com"
+                  placeholder="usuario.hospital"
                 />
               </div>
             </div>

@@ -15,7 +15,7 @@ describe("RecordsPage ICU Data Grid & Print Layout", () => {
   it("renders patient selector, date input, print button, and 24-hour ICU shift grid headers", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
       if (url === "/auth/me") {
-        return Promise.resolve({ id: 1, full_name: "Nurse Test", role: "CLINICAL" });
+        return Promise.resolve({ id: 1, username: "nurse.test", full_name: "Nurse Test", role: "CLINICAL" });
       }
       if (url === "/patients") {
         return Promise.resolve([
@@ -171,7 +171,7 @@ describe("RecordsPage ICU Data Grid & Print Layout", () => {
 
     render(<RecordsPage />);
 
-    expect(await screen.findByText((content) => content.includes("Noradrenalina (10ml)") && content.includes("Soro Fisiológico 0.9% (250ml)"))).toBeInTheDocument();
+    expect(await screen.findByText((content) => content.includes("Noradrenalina (10 ml)") && content.includes("Soro Fisiológico 0.9% (250 ml)"))).toBeInTheDocument();
   });
 
   it("supports qualitative measurements ++ without NaN calculations", async () => {
@@ -190,8 +190,9 @@ describe("RecordsPage ICU Data Grid & Print Layout", () => {
               patient_id: 1,
               registered_by_id: 1,
               direction: "OUTPUT",
-              category: "STOOL",
-              volume_ml: "++",
+              category: "URINE",
+              qualitative_value: "++",
+              volume_ml: null,
               occurred_at: "2026-08-05T07:00:00",
               notes: null,
               created_at: "2026-08-05T07:00:00",
@@ -214,6 +215,9 @@ describe("RecordsPage ICU Data Grid & Print Layout", () => {
     });
 
     render(<RecordsPage />);
+    
+    await new Promise((r) => setTimeout(r, 1000));
+    console.log(document.body.innerHTML);
 
     expect(await screen.findByDisplayValue("++")).toBeInTheDocument();
     expect(screen.getAllByText("500 ml").length).toBeGreaterThan(0);

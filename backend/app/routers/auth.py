@@ -12,9 +12,9 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 @router.post("/login", response_model=Token)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    user = db.scalar(select(User).where(User.username == payload.username.lower()))
     if not user or not verify_password(payload.password, user.password_hash) or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-mail ou senha inválidos")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos")
     return Token(access_token=create_access_token(str(user.id)))
 
 
@@ -26,9 +26,11 @@ def me(current_user: User = Depends(get_current_user)):
 @router.post("/users", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.ADMIN, UserRole.DEVELOPER))):
     """Somente administradores podem provisionar acessos ao prontuário."""
+    if db.scalar(select(User).where(User.username == payload.username.lower())):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um usuário com este nome de usuário")
     if db.scalar(select(User).where(User.email == payload.email.lower())):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um usuário com este e-mail")
-    user = User(full_name=payload.full_name, email=payload.email.lower(), password_hash=hash_password(payload.password), role=payload.role)
+    user = User(username=payload.username.lower(), full_name=payload.full_name, email=payload.email.lower(), password_hash=hash_password(payload.password), role=payload.role)
     db.add(user)
     db.commit()
     db.refresh(user)

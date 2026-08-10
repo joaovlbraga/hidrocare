@@ -14,7 +14,7 @@ describe("UAT E2E: Concurrency & Multi-click Idempotency", () => {
 
   it("handles rapid single cell save triggers without duplicate network mutations", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "CLINICAL" });
+      if (url === "/auth/me") return Promise.resolve({ username: "test.user", role: "CLINICAL" });
       if (url === "/patients") {
         return Promise.resolve([
           { id: 1, full_name: "Paciente Concorrência UI", bed: "UTI 02", medical_record: "REC-CONC-UI" },

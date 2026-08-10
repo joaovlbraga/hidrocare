@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({
 describe("LoginPage", () => {
   it("keeps the login submit control available with labelled credentials", () => {
     render(<LoginPage />);
-    expect(screen.getByLabelText("E-mail")).toHaveAttribute("name", "email");
+    expect(screen.getByLabelText("Usuário")).toHaveAttribute("name", "username");
     expect(screen.getByRole("button", { name: "Entrar" })).toBeEnabled();
   });
 });

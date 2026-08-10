@@ -26,7 +26,7 @@ describe("UAT E2E: Print Layout Integrity & 15+ Itemized Medications", () => {
     }));
 
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ role: "CLINICAL" });
+      if (url === "/auth/me") return Promise.resolve({ username: "test.user", role: "CLINICAL" });
       if (url === "/patients") {
         return Promise.resolve([
           { id: 1, full_name: "Paciente Impressão UAT", bed: "UTI 03", medical_record: "REC-PRINT-01" },
@@ -39,11 +39,14 @@ describe("UAT E2E: Print Layout Integrity & 15+ Itemized Medications", () => {
     });
 
     render(<RecordsPage />);
+    
+    await new Promise((r) => setTimeout(r, 1000));
+    console.log(document.body.innerHTML);
 
     expect(
       await screen.findByText((content) =>
-        content.includes("Medicamento Complexo de Longo Nome em Infusão Contínua de UTI #1 (10ml)") &&
-        content.includes("Medicamento Complexo de Longo Nome em Infusão Contínua de UTI #15 (24ml)")
+        content.includes("Medicamento Complexo de Longo Nome em Infusão Contínua de UTI #1 (10 ml)") &&
+        content.includes("Medicamento Complexo de Longo Nome em Infusão Contínua de UTI #15 (24 ml)")
       )
     ).toBeInTheDocument();
 
@@ -53,7 +56,7 @@ describe("UAT E2E: Print Layout Integrity & 15+ Itemized Medications", () => {
 
   it("renders authenticated professional full name in printed signature footer", async () => {
     (apiFetch as any).mockImplementation((url: string) => {
-      if (url === "/auth/me") return Promise.resolve({ full_name: "Dra. Ana Paula", role: "CLINICAL" });
+      if (url === "/auth/me") return Promise.resolve({ username: "ana.paula", full_name: "Dra. Ana Paula", role: "CLINICAL" });
       if (url === "/patients") {
         return Promise.resolve([
           { id: 1, full_name: "Paciente Teste", bed: "UTI 01", medical_record: "REC01" },

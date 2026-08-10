@@ -115,6 +115,7 @@ def as_clinical(client):
     if not db.get(User, 2):
         db.add(User(
             id=2,
+            username="clinical",
             full_name="Nurse Clinical",
             email="clinical@hospital.com",
             password_hash="fakehash",
