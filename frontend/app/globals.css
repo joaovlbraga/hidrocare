@@ -65,6 +65,9 @@
   }
 
   /* Table header cells */
+  .print-table thead {
+    display: table-header-group !important;
+  }
   .print-table thead th {
     font-size: 7px !important;
     padding: 1.5px 2px !important;
@@ -92,6 +95,7 @@
 
   /* Totals footer: glue to bottom of table */
   .print-table tfoot {
+    display: table-footer-group !important;
     break-before: avoid !important;
     page-break-before: avoid !important;
   }

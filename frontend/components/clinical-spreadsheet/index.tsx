@@ -323,28 +323,39 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       hour: string,
       category: string,
       direction: "INPUT" | "OUTPUT",
-      volumeMl: number | null,
+      volumeRaw: string,
       notes: string
     ) => {
       const occurredAt = getOccurredAt(targetDate, hour);
+      const payloadVol = volumeRaw.trim() === "" ? null : volumeRaw.trim();
       const res = await apiFetch("/balances/records", {
         method: "POST",
         body: JSON.stringify({
           patient_id: patientId,
           direction,
           category,
-          volume_ml: volumeMl,
+          volume_ml: payloadVol,
           occurred_at: occurredAt,
           notes,
         }),
       });
+
+      const num = payloadVol !== null ? parseFloat(payloadVol) : null;
+      const isQual = payloadVol !== null && Number.isNaN(num);
+      const parsedVol = isQual ? null : num;
+      const parsedQual = isQual ? payloadVol : null;
+
+      const updatedVol = res.volume_ml !== undefined && res.volume_ml !== null ? (typeof res.volume_ml === "number" ? res.volume_ml : parseFloat(String(res.volume_ml))) : parsedVol;
+      const updatedQual = res.qualitative_value !== undefined ? res.qualitative_value : parsedQual;
+
       const createdRecord: FluidRecord = {
         id: res.id,
         patient_id: patientId,
         registered_by_id: 0,
         direction,
         category,
-        volume_ml: volumeMl,
+        volume_ml: Number.isFinite(updatedVol) ? updatedVol : null,
+        qualitative_value: updatedQual,
         occurred_at: occurredAt,
         notes,
         created_at: new Date().toISOString(),
@@ -356,19 +367,29 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
   );
 
   const handleUpdateRecord = useCallback(
-    async (recordId: number, volumeMl: number | null, notes: string) => {
+    async (recordId: number, volumeRaw: string, notes: string) => {
+      const payloadVol = volumeRaw.trim() === "" ? null : volumeRaw.trim();
       const res = await apiFetch(`/balances/records/${recordId}`, {
         method: "PATCH",
-        body: JSON.stringify({ volume_ml: volumeMl, notes }),
+        body: JSON.stringify({ volume_ml: payloadVol, notes }),
       });
+
+      const num = payloadVol !== null ? parseFloat(payloadVol) : null;
+      const isQual = payloadVol !== null && Number.isNaN(num);
+      const parsedVol = isQual ? null : num;
+      const parsedQual = isQual ? payloadVol : null;
+
+      const updatedVol = res.volume_ml !== undefined && res.volume_ml !== null ? (typeof res.volume_ml === "number" ? res.volume_ml : parseFloat(String(res.volume_ml))) : parsedVol;
+      const updatedQual = res.qualitative_value !== undefined ? res.qualitative_value : parsedQual;
+
       setFluids((prev) =>
         prev.map((r) =>
           r.id === recordId
             ? {
                 ...r,
-                volume_ml: res.volume_ml ?? volumeMl,
-                qualitative_value: res.qualitative_value ?? null,
-                notes: res.notes ?? notes,
+                volume_ml: Number.isFinite(updatedVol) ? updatedVol : null,
+                qualitative_value: updatedQual,
+                notes,
               }
             : r
         )
@@ -492,7 +513,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="rounded-xl border border-slate-200 bg-white text-slate-900 shadow-card overflow-hidden print-no-break print:border-black print:bg-white print:text-black print:rounded-none print:shadow-none">
+      <div className="rounded-xl border border-slate-200 bg-white text-slate-900 shadow-card overflow-hidden print:border-black print:bg-white print:text-black print:rounded-none print:shadow-none">
         <div className="w-full overflow-x-auto print:overflow-visible">
           <table className="w-full border-collapse text-xs print-table">
             <thead>

@@ -25,9 +25,9 @@ export type MultiItemSheetCellProps = {
   isReadOnly?: boolean;
   /** Volume is optional for DRAIN/STOOL — notes alone are sufficient. */
   volumeOptional?: boolean;
-  onAdd: (hour: string, category: string, direction: "INPUT" | "OUTPUT", volumeMl: number | null, notes: string) => Promise<void>;
+  onAdd: (hour: string, category: string, direction: "INPUT" | "OUTPUT", volumeRaw: string, notes: string) => Promise<void>;
   onDelete: (recordId: number) => Promise<void>;
-  onEdit: (recordId: number, volumeMl: number | null, notes: string) => Promise<void>;
+  onEdit: (recordId: number, volumeRaw: string, notes: string) => Promise<void>;
 };
 
 export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
@@ -46,6 +46,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
   const [itemVol, setItemVol] = useState("");
   const [itemNotes, setItemNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const notesInputRef = React.useRef<HTMLInputElement>(null);
 
   // Edit state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -54,7 +55,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
 
   function startEdit(r: FluidRecord) {
     setEditingId(r.id);
-    setItemVol(r.volume_ml !== null && r.volume_ml !== undefined ? String(r.volume_ml) : "");
+    setItemVol(r.qualitative_value ? r.qualitative_value : (r.volume_ml !== null && r.volume_ml !== undefined ? String(r.volume_ml) : ""));
     setItemNotes(r.notes ?? "");
   }
 
@@ -66,23 +67,26 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const vol = itemVol.trim() === "" ? null : parseFloat(itemVol.trim());
-    const notes = itemNotes.trim();
+    const volRaw = itemVol.trim();
+    const notesRaw = itemNotes.trim();
 
     // At least one of volume or notes must be present
-    if (vol === null && !notes) return;
+    if (volRaw === "" && !notesRaw) return;
     // If volume is required (non-DRAIN/STOOL) and missing, bail
-    if (!volumeOptional && (vol === null || isNaN(vol) || vol <= 0)) return;
+    if (!volumeOptional && volRaw === "") return;
 
     setSaving(true);
     try {
       if (editingId !== null) {
-        await onEdit(editingId, vol, notes);
+        await onEdit(editingId, volRaw, notesRaw);
         cancelEdit();
       } else {
-        await onAdd(hour, category, direction, vol, notes);
+        await onAdd(hour, category, direction, volRaw, notesRaw);
         setItemVol("");
         setItemNotes("");
+        if (category === "MEDICATION") {
+          notesInputRef.current?.focus();
+        }
       }
     } catch (err) {
       alert(
@@ -177,14 +181,34 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
               <label className="text-xs font-semibold text-slate-700">
                 Descrição / Nome
               </label>
-              <Input
-                placeholder={volumeOptional ? "Ex: Dreno de Tórax, Penrose..." : "Ex: Noradrenalina 0.1 mcg/kg/min"}
-                value={itemNotes}
-                onChange={(e) => setItemNotes(e.target.value)}
-                className="h-8 text-xs"
-                required={volumeOptional}
-                list={category === "MEDICATION" ? "medication-list" : undefined}
-              />
+              <div className="relative">
+                <Input
+                  ref={notesInputRef}
+                  placeholder={volumeOptional ? "Ex: Dreno de Tórax, Penrose..." : "Ex: Noradrenalina 0.1 mcg/kg/min"}
+                  value={itemNotes}
+                  onChange={(e) => setItemNotes(e.target.value)}
+                  onFocus={(e) => {
+                    if (category === "MEDICATION") e.target.select();
+                  }}
+                  className={cn("h-8 text-xs", category === "MEDICATION" && itemNotes.trim() !== "" ? "pr-7" : "")}
+                  required={volumeOptional}
+                  list={category === "MEDICATION" ? "medication-list" : undefined}
+                />
+                {category === "MEDICATION" && itemNotes.trim() !== "" && (
+                  <button
+                    type="button"
+                    title="Limpar"
+                    aria-label="Limpar campo"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center h-3.5 w-3.5 text-slate-400 hover:text-slate-600"
+                    onClick={() => {
+                      setItemNotes("");
+                      notesInputRef.current?.focus();
+                    }}
+                  >
+                    <X className="h-full w-full" />
+                  </button>
+                )}
+              </div>
               {category === "MEDICATION" && (
                 <datalist id="medication-list">
                   <option value="Adrenalina" />
@@ -229,10 +253,9 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
                 Volume (ml){volumeOptional && <span className="ml-1 font-normal text-slate-500">(opcional)</span>}
               </label>
               <Input
-                type="number"
-                min="0"
-                max="5000"
-                placeholder="Ex: 50"
+                type="text"
+                maxLength={50}
+                placeholder="Ex: 50 ou ++"
                 value={itemVol}
                 onChange={(e) => setItemVol(e.target.value)}
                 className="h-8 text-xs font-mono"

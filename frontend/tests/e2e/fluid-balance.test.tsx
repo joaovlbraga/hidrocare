@@ -38,6 +38,18 @@ describe("UAT E2E: Fluid Balance Calculation & Qualitative Values", () => {
               id: 302,
               patient_id: 1,
               registered_by_id: 1,
+              direction: "INPUT",
+              category: "MEDICATION",
+              volume_ml: null,
+              qualitative_value: "++",
+              occurred_at: "2026-08-06T08:00:00",
+              notes: "Amiodarona",
+              created_at: "2026-08-06T08:00:00",
+            },
+            {
+              id: 303,
+              patient_id: 1,
+              registered_by_id: 1,
               direction: "OUTPUT",
               category: "URINE",
               volume_ml: null,
@@ -54,7 +66,13 @@ describe("UAT E2E: Fluid Balance Calculation & Qualitative Values", () => {
 
     render(<RecordsPage />);
 
+    // SingleCellInput uses findByDisplayValue
     expect(await screen.findByDisplayValue("+++")).toBeInTheDocument();
+    
+    // MultiItemSheetCell prints summary on grid cell
+    expect(await screen.findByText((content) => content.includes("Amiodarona (++)"))).toBeInTheDocument();
+    
+    // Totals should remain unaffected by qualitative values (100)
     expect(screen.getAllByText("100 ml").length).toBeGreaterThan(0);
     expect(screen.getAllByText("+100 ml").length).toBeGreaterThan(0);
     expect(screen.getByText(/saldo acumulado:/i)).toBeInTheDocument();
