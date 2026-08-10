@@ -24,7 +24,7 @@ def me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/users", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
-def create_user(payload: UserCreate, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.ADMIN))):
+def create_user(payload: UserCreate, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.ADMIN, UserRole.DEVELOPER))):
     """Somente administradores podem provisionar acessos ao prontuário."""
     if db.scalar(select(User).where(User.email == payload.email.lower())):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um usuário com este e-mail")

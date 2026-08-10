@@ -7,25 +7,33 @@ import { ClipboardPlus, Droplets, LayoutDashboard, LogOut, Menu, UserPlus, Users
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import { DevToolsHider } from "@/components/devtools-hider";
+
 const navItems = [
-  { href: "/", label: "Visão geral", icon: LayoutDashboard, adminOnly: false },
-  { href: "/registros", label: "Registros", icon: ClipboardPlus, adminOnly: false },
-  { href: "/pacientes", label: "Pacientes", icon: UsersRound, adminOnly: true },
-  { href: "/usuarios", label: "Usuários", icon: UserPlus, adminOnly: true },
+  { href: "/", label: "Visão geral", icon: LayoutDashboard, roles: ["CLINICAL", "ADMIN", "DEVELOPER"] },
+  { href: "/registros", label: "Registros", icon: ClipboardPlus, roles: ["CLINICAL", "ADMIN", "DEVELOPER"] },
+  { href: "/pacientes", label: "Pacientes", icon: UsersRound, roles: ["ADMIN"] },
+  { href: "/usuarios", label: "Usuários", icon: UserPlus, roles: ["ADMIN", "DEVELOPER"] },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     apiFetch("/auth/me")
-      .then((user: { role: string }) => setIsAdmin(user.role === "ADMIN"))
+      .then((user: { role: string }) => setRole(user.role))
       .catch(() => undefined);
   }, []);
 
-  const items = navItems.filter((item) => !item.adminOnly || isAdmin);
+  useEffect(() => {
+    if (role === "CLINICAL" && pathname === "/usuarios") {
+      location.href = "/";
+    }
+  }, [role, pathname]);
+
+  const items = navItems.filter((item) => role && item.roles.includes(role));
 
   function linkClass(href: string) {
     const active = href === "/" ? pathname === "/" : pathname?.startsWith(href);
@@ -44,6 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 lg:flex print:bg-white print:min-h-0">
+      <DevToolsHider role={role} />
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-slate-200 bg-white p-6 lg:flex print:hidden">
         <div className="space-y-6">

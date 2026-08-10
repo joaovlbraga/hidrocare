@@ -11,6 +11,7 @@ from app.database import Base
 class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     CLINICAL = "CLINICAL"
+    DEVELOPER = "DEVELOPER"
 
 
 class FluidType(str, enum.Enum):

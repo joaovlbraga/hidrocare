@@ -57,6 +57,9 @@ export default function UsersPage() {
         <p>
           <strong className="text-slate-800">Administrador:</strong> Acesso completo, incluindo cadastro de pacientes e gestão de usuários.
         </p>
+        <p>
+          <strong className="text-slate-800">Desenvolvedor:</strong> Acesso técnico voltado para operações de engenharia e ferramentas de desenvolvimento.
+        </p>
       </CardContent>
     </Card>
   );
@@ -104,8 +107,9 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="CLINICAL">Equipe assistencial</SelectItem>
-                    <SelectItem value="ADMIN">Administrador</SelectItem>
+                    <SelectItem value="CLINICAL">Enfermeiros</SelectItem>
+                    <SelectItem value="ADMIN">Administradores</SelectItem>
+                    <SelectItem value="DEVELOPER">Desenvolvedores</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
