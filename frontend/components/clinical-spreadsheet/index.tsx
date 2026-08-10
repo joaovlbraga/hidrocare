@@ -5,10 +5,11 @@ import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { FluidRecord, DailySpreadsheetPayload, CurrentUser } from "./types";
+import { FluidRecord, DailySpreadsheetPayload, CurrentUser, VitalSignRecord } from "./types";
 import { SingleCellInput } from "./single-cell-input";
 import { MultiItemSheetCell } from "./multi-item-sheet-cell";
 import { NutritionSheetCell } from "./nutrition-sheet-cell";
+import { VitalSignCell } from "./vital-sign-cell";
 
 type ClinicalSpreadsheetProps = {
   patientId: number;
@@ -36,6 +37,7 @@ export function getOccurredAt(dateStr: string, hourStr: string): string {
 
 export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadsheetProps) {
   const [fluids, setFluids] = useState<FluidRecord[]>([]);
+  const [vitals, setVitals] = useState<VitalSignRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [cumulativeBalance, setCumulativeBalance] = useState<number | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -77,14 +79,17 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
         if (!active) return;
         if (Array.isArray(data)) {
           setFluids(data);
+          setVitals([]);
         } else {
           setFluids(data.fluids || []);
+          setVitals(data.vitals || []);
         }
         setLoading(false);
       })
       .catch(() => {
         if (active) {
           setFluids([]);
+          setVitals([]);
           setLoading(false);
         }
       });
@@ -133,6 +138,16 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
     }
     return map;
   }, [fluids]);
+
+  const vitalsByHourMap = useMemo(() => {
+    const map = new Map<string, VitalSignRecord>();
+    for (const r of vitals) {
+      if (!r.occurred_at) continue;
+      const hour = r.occurred_at.slice(11, 16);
+      map.set(hour, r);
+    }
+    return map;
+  }, [vitals]);
 
   const triggerSuccess = useCallback((cellKey: string) => {
     setSuccessMap((prev) => ({ ...prev, [cellKey]: true }));
@@ -245,6 +260,62 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
       }
     },
     [fluidsByHourCategoryMap, patientId, targetDate, triggerSuccess, refreshDailyBalance, savingMap]
+  );
+
+  // Handle Vital Sign single cell save (Pulse, BP, Temp, Resp, SpO2, HGT)
+  const handleVitalCellSave = useCallback(
+    async (hour: string, field: string, valString: string) => {
+      const cellKey = `vital-${hour}-${field}`;
+      if (savingMap[cellKey]) return;
+      
+      const occurredAt = getOccurredAt(targetDate, hour);
+      const existingRecord = vitalsByHourMap.get(hour);
+      const trimmed = valString.trim();
+
+      const existingValStr = existingRecord
+        ? (existingRecord[field as keyof VitalSignRecord] !== null && existingRecord[field as keyof VitalSignRecord] !== undefined)
+          ? String(existingRecord[field as keyof VitalSignRecord])
+          : ""
+        : "";
+
+      if (existingRecord && existingValStr === trimmed) return;
+      if (!existingRecord && trimmed === "") return;
+
+      setErrorMap((prev) => ({ ...prev, [cellKey]: false }));
+      setSavingMap((prev) => ({ ...prev, [cellKey]: true }));
+
+      try {
+        const parsedValue = field === "blood_pressure" ? trimmed || null : (trimmed === "" ? null : parseFloat(trimmed));
+
+        const res = await apiFetch("/vitals/records", {
+          method: "POST",
+          body: JSON.stringify({
+            patient_id: patientId,
+            occurred_at: occurredAt,
+            [field]: parsedValue,
+          }),
+        });
+
+        if (existingRecord) {
+          // Merge partial update into local state without dropping other fields
+          setVitals((prev) => 
+            prev.map((r) => 
+              r.id === existingRecord.id ? { ...r, [field]: parsedValue } : r
+            )
+          );
+        } else {
+          // New record created for this hour
+          setVitals((prev) => [...prev, res as VitalSignRecord]);
+        }
+        
+        triggerSuccess(cellKey);
+      } catch {
+        setErrorMap((prev) => ({ ...prev, [cellKey]: true }));
+      } finally {
+        setSavingMap((prev) => ({ ...prev, [cellKey]: false }));
+      }
+    },
+    [vitalsByHourMap, patientId, targetDate, triggerSuccess, savingMap]
   );
 
   const handleAddMultiItemRecord = useCallback(
@@ -433,24 +504,34 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                 <th className="p-1.5 text-center border-r-2 border-r-emerald-300 bg-emerald-50 text-emerald-900 font-extrabold print:bg-emerald-50 print:text-black print:border-black" colSpan={4}>
                   GANHOS (ENTRADAS)
                 </th>
-                <th className="p-1.5 text-center bg-rose-50 text-rose-900 font-extrabold print:bg-rose-50 print:text-black print:border-black" colSpan={5}>
+                <th className="p-1.5 text-center border-r-2 border-r-rose-300 bg-rose-50 text-rose-900 font-extrabold print:bg-rose-50 print:text-black print:border-black" colSpan={5}>
                   PERDAS (SAÍDAS)
+                </th>
+                <th className="p-1.5 text-center bg-sky-50 text-sky-900 font-extrabold print:bg-sky-50 print:text-black print:border-black" colSpan={6}>
+                  SINAIS VITAIS
                 </th>
               </tr>
 
               {/* Header Row 2: Category Columns */}
               <tr className="border-b-2 border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-700 print:border-black print:text-black print:bg-white">
                 {/* Ganhos (Entradas) */}
-                <th className="w-[15%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Medicações</th>
-                <th className="w-[12%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Outras Entr.</th>
-                <th className="w-[12%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Nutrição</th>
-                <th className="w-[11%] p-1 text-center border-r-2 border-r-emerald-300 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">IV Hydr.</th>
+                <th className="w-[8%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Medicações</th>
+                <th className="w-[7%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Outras Entr.</th>
+                <th className="w-[7%] p-1 text-center border-r border-slate-200 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">Nutrição</th>
+                <th className="w-[6%] p-1 text-center border-r-2 border-r-emerald-300 bg-emerald-50/50 text-emerald-950 font-bold print:border-black print:bg-white">IV Hydr.</th>
                 {/* Perdas (Saídas) */}
-                <th className="w-[10%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Diurese</th>
-                <th className="w-[10%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">SNE / SNG</th>
-                <th className="w-[10%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Dreno</th>
-                <th className="w-[10%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Fezes</th>
-                <th className="w-[10%] p-1 text-center bg-rose-50/50 text-rose-950 font-bold print:bg-white">Outras Saídas</th>
+                <th className="w-[6%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Diurese</th>
+                <th className="w-[6%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">SNE/SNG</th>
+                <th className="w-[6%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Dreno</th>
+                <th className="w-[6%] p-1 text-center border-r border-slate-200 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Fezes</th>
+                <th className="w-[8%] p-1 text-center border-r-2 border-r-rose-300 bg-rose-50/50 text-rose-950 font-bold print:border-black print:bg-white">Outras Saídas</th>
+                {/* Sinais Vitais */}
+                <th className="w-[5%] p-1 text-center border-r border-slate-200 bg-sky-50/50 text-sky-950 font-bold print:border-black print:bg-white">P</th>
+                <th className="w-[7%] p-1 text-center border-r border-slate-200 bg-sky-50/50 text-sky-950 font-bold print:border-black print:bg-white">PA</th>
+                <th className="w-[5%] p-1 text-center border-r border-slate-200 bg-sky-50/50 text-sky-950 font-bold print:border-black print:bg-white">T</th>
+                <th className="w-[5%] p-1 text-center border-r border-slate-200 bg-sky-50/50 text-sky-950 font-bold print:border-black print:bg-white">R</th>
+                <th className="w-[5%] p-1 text-center border-r border-slate-200 bg-sky-50/50 text-sky-950 font-bold print:border-black print:bg-white">SpO2</th>
+                <th className="w-[5%] p-1 text-center bg-sky-50/50 text-sky-950 font-bold print:bg-white">HGT</th>
               </tr>
             </thead>
 
@@ -470,6 +551,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                 const drainList = fluidsByHourCategoryMap.get(`${hour}-DRAIN`) || [];
                 const stoolList = fluidsByHourCategoryMap.get(`${hour}-STOOL`) || [];
                 const otherOutputList = fluidsByHourCategoryMap.get(`${hour}-OTHER_OUTPUT`) || [];
+                const vitalRecord = vitalsByHourMap.get(hour);
 
                 return (
                   <tr key={hour} className="h-7 hover:bg-slate-50/80 transition-colors print:h-auto print:hover:bg-transparent print:break-inside-avoid">
@@ -608,17 +690,109 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                     </td>
 
                     {/* Outras Saídas (Multi-Item Sheet Drawer) */}
-                    <td className="p-0 print:h-auto print:align-top">
+                    <td className="p-0 border-r-2 border-r-rose-300 print:border-black print:h-auto print:align-top">
                       <MultiItemSheetCell
                         hour={hour}
                         category="OTHER_OUTPUT"
                         direction="OUTPUT"
-                        title="Outras Saídas / Drenagens"
+                        title="Outras Saídas Hídricas"
                         records={otherOutputList}
                         isReadOnly={isReadOnlyShift}
+                        volumeOptional
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
                         onEdit={handleUpdateRecord}
+                      />
+                    </td>
+
+                    {/* SINAIS VITAIS */}
+                    {/* Pulse (P) */}
+                    <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="pulse"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-pulse`]}
+                        isSuccess={successMap[`vital-${hour}-pulse`]}
+                        isError={errorMap[`vital-${hour}-pulse`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
+                      />
+                    </td>
+
+                    {/* Blood Pressure (PA) */}
+                    <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="blood_pressure"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-blood_pressure`]}
+                        isSuccess={successMap[`vital-${hour}-blood_pressure`]}
+                        isError={errorMap[`vital-${hour}-blood_pressure`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
+                      />
+                    </td>
+
+                    {/* Temperature (T) */}
+                    <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="temperature"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-temperature`]}
+                        isSuccess={successMap[`vital-${hour}-temperature`]}
+                        isError={errorMap[`vital-${hour}-temperature`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
+                      />
+                    </td>
+
+                    {/* Respiration (R) */}
+                    <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="respiration"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-respiration`]}
+                        isSuccess={successMap[`vital-${hour}-respiration`]}
+                        isError={errorMap[`vital-${hour}-respiration`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
+                      />
+                    </td>
+
+                    {/* SpO2 */}
+                    <td className="p-0 border-r border-slate-200 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="spo2"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-spo2`]}
+                        isSuccess={successMap[`vital-${hour}-spo2`]}
+                        isError={errorMap[`vital-${hour}-spo2`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
+                      />
+                    </td>
+
+                    {/* HGT */}
+                    <td className="p-0 print:border-black print:h-auto print:align-top">
+                      <VitalSignCell
+                        hour={hour}
+                        field="hgt"
+                        rowIndex={rowIndex}
+                        existingRecord={vitalRecord}
+                        isSaving={savingMap[`vital-${hour}-hgt`]}
+                        isSuccess={successMap[`vital-${hour}-hgt`]}
+                        isError={errorMap[`vital-${hour}-hgt`]}
+                        isReadOnly={isReadOnlyShift}
+                        onSave={handleVitalCellSave}
                       />
                     </td>
                   </tr>
@@ -662,9 +836,17 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                 <td className="p-1 text-center border-r border-slate-200 text-rose-700 font-extrabold print:text-black print:border-black">
                   {totals.colSums["STOOL"] ? `${totals.colSums["STOOL"]} ml` : "—"}
                 </td>
-                <td className="p-1 text-center text-rose-700 font-extrabold print:text-black">
+                <td className="p-1 text-center border-r-2 border-r-rose-300 text-rose-700 font-extrabold print:text-black print:border-black">
                   {totals.colSums["OTHER_OUTPUT"] ? `${totals.colSums["OTHER_OUTPUT"]} ml` : "—"}
                 </td>
+
+                {/* Sinais Vitais Totals (Empty) */}
+                <td className="p-1 border-r border-slate-200 print:border-black"></td>
+                <td className="p-1 border-r border-slate-200 print:border-black"></td>
+                <td className="p-1 border-r border-slate-200 print:border-black"></td>
+                <td className="p-1 border-r border-slate-200 print:border-black"></td>
+                <td className="p-1 border-r border-slate-200 print:border-black"></td>
+                <td className="p-1 print:border-black"></td>
               </tr>
             </tfoot>
           </table>

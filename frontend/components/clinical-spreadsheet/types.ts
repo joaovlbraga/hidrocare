@@ -15,6 +15,22 @@ export type FluidRecord = {
 
 export type DailySpreadsheetPayload = {
   fluids: FluidRecord[];
+  vitals: VitalSignRecord[];
+};
+
+export type VitalSignRecord = {
+  id: number;
+  patient_id: number;
+  registered_by_id: number;
+  updated_by_id?: number | null;
+  occurred_at: string;
+  pulse: number | null;
+  blood_pressure: string | null;
+  temperature: number | null;
+  respiration: number | null;
+  spo2: number | null;
+  hgt: number | null;
+  created_at: string;
 };
 
 export type ShiftHour = string;
