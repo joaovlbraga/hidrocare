@@ -55,6 +55,11 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
       await onAdd(hour, dietType, vol, itemNotes.trim());
       setItemVol("");
       setItemNotes("");
+    } catch (err) {
+      alert(
+        "Não foi possível registrar a dieta. " +
+        (err instanceof Error ? err.message : "Verifique os dados e tente novamente.")
+      );
     } finally {
       setSaving(false);
     }

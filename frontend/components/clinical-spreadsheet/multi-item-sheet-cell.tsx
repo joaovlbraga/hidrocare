@@ -84,6 +84,11 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
         setItemVol("");
         setItemNotes("");
       }
+    } catch (err) {
+      alert(
+        "Não foi possível salvar o lançamento. " +
+        (err instanceof Error ? err.message : "Verifique os dados e tente novamente.")
+      );
     } finally {
       setSaving(false);
     }
