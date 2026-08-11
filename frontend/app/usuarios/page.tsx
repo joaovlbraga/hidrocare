@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { UserPlus, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FormPanel } from "@/components/form-panel";
@@ -17,6 +17,13 @@ export default function UsersPage() {
   const [role, setRole] = useState("CLINICAL");
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch("/auth/me")
+      .then((user) => setCurrentUserRole(user.role))
+      .catch(() => {});
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,7 +37,14 @@ export default function UsersPage() {
     try {
       await apiFetch("/auth/users", {
         method: "POST",
-        body: JSON.stringify({ username: data.get("username"), full_name: data.get("full_name"), email: data.get("email"), password, role }),
+        body: JSON.stringify({ 
+          username: data.get("username"), 
+          full_name: data.get("full_name"), 
+          email: data.get("email") || null, 
+          phone: data.get("phone") || null,
+          password, 
+          role 
+        }),
       });
       form.reset();
       setRole("CLINICAL");
@@ -86,14 +100,24 @@ export default function UsersPage() {
             </div>
 
             <div>
-              <Label htmlFor="email">E-mail profissional</Label>
+              <Label htmlFor="email">E-mail profissional (opcional)</Label>
               <Input
                 id="email"
-                required
                 name="email"
                 type="email"
                 className="mt-1.5"
                 placeholder="profissional@hospital.com"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="phone">Telefone / WhatsApp (opcional)</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="text"
+                className="mt-1.5"
+                placeholder="Ex: (12) 99999-9999"
               />
             </div>
           </div>
@@ -108,14 +132,18 @@ export default function UsersPage() {
               <div>
                 <Label htmlFor="role">Perfil de Acesso</Label>
                 <input type="hidden" name="role" value={role} />
-                <Select value={role} onValueChange={setRole}>
+                <Select value={role} onValueChange={setRole} disabled={currentUserRole === "ADMIN"}>
                   <SelectTrigger id="role" className="mt-1.5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CLINICAL">Enfermeiros</SelectItem>
-                    <SelectItem value="ADMIN">Administradores</SelectItem>
-                    <SelectItem value="DEVELOPER">Desenvolvedores</SelectItem>
+                    {currentUserRole === "DEVELOPER" && (
+                      <>
+                        <SelectItem value="ADMIN">Administradores</SelectItem>
+                        <SelectItem value="DEVELOPER">Desenvolvedores</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -20,7 +20,8 @@ class UserPublic(BaseModel):
     id: int
     username: str
     full_name: str
-    email: EmailStr
+    email: EmailStr | None = None
+    phone: str | None = None
     role: UserRole
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,9 +29,17 @@ class UserPublic(BaseModel):
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=60)
     full_name: str = Field(min_length=3, max_length=150)
-    email: EmailStr
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=20)
     password: str = Field(min_length=8, max_length=72)
     role: UserRole = UserRole.CLINICAL
+
+    @field_validator("email", "phone", mode="before")
+    @classmethod
+    def validate_empty_strings(cls, v: str | None) -> str | None:
+        if v is not None and str(v).strip() == "":
+            return None
+        return v
 
 
 class PasswordResetRequest(BaseModel):

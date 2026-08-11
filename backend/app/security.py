@@ -62,3 +62,14 @@ def assert_can_mutate_record(occurred_at: "datetime", current_user: User) -> Non
             detail="Não é possível editar dados de um plantão já encerrado. Solicite auditoria de um administrador.",
         )
 
+
+def assert_owns_record(record_owner_id: int, current_user: User) -> None:
+    """Raises HTTP 403 if a CLINICAL user attempts to mutate a record they did not create.
+    ADMIN and DEVELOPER roles bypass this check entirely (supervisory/audit override).
+    """
+    if current_user.role == UserRole.CLINICAL and current_user.id != record_owner_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Você só tem permissão para editar ou remover os registros lançados pelo seu próprio usuário.",
+        )
+

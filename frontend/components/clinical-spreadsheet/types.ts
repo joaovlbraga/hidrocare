@@ -36,9 +36,10 @@ export type VitalSignRecord = {
 export type ShiftHour = string;
 
 export type CurrentUser = {
+  id: number;
   username: string;
   full_name?: string;
   name?: string;
-  role: "ADMIN" | "CLINICAL";
+  role: "ADMIN" | "CLINICAL" | "DEVELOPER";
 };
 

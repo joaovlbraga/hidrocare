@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Patient, User, VitalSignRecord
 from app.schemas import VitalSignCreate, VitalSignPublic, VitalSignUpdate
-from app.security import assert_can_mutate_record, get_current_user
+from app.security import assert_can_mutate_record, assert_owns_record, get_current_user
 from app.utils.time_windows import get_clinical_shift_window
 
 router = APIRouter(prefix="/vitals", tags=["Sinais Vitais"])
@@ -29,6 +29,7 @@ def create_or_upsert_vitals(payload: VitalSignCreate, db: Session = Depends(get_
     if existing:
         # This is a functional edit — enforce shift-lock for CLINICAL users.
         assert_can_mutate_record(existing.occurred_at, current_user)
+        assert_owns_record(existing.registered_by_id, current_user)
         # Perform upsert update if record already exists for this hour
         update_data = payload.model_dump(exclude_unset=True, exclude={"patient_id", "occurred_at"})
         for field, val in update_data.items():
@@ -52,6 +53,7 @@ def update_vitals(record_id: int, payload: VitalSignUpdate, db: Session = Depend
         raise HTTPException(status_code=404, detail="Registro de sinais vitais não encontrado")
 
     assert_can_mutate_record(record.occurred_at, current_user)
+    assert_owns_record(record.registered_by_id, current_user)
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, val in update_data.items():

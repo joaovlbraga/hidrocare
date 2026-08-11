@@ -14,7 +14,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { FluidRecord } from "./types";
+import { FluidRecord, CurrentUser } from "./types";
 
 export type MultiItemSheetCellProps = {
   hour: string;
@@ -22,6 +22,7 @@ export type MultiItemSheetCellProps = {
   direction: "INPUT" | "OUTPUT";
   title: string;
   records: FluidRecord[];
+  currentUser?: CurrentUser | null;
   isReadOnly?: boolean;
   /** Volume is optional for DRAIN/STOOL — notes alone are sufficient. */
   volumeOptional?: boolean;
@@ -36,6 +37,7 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
   direction,
   title,
   records,
+  currentUser,
   isReadOnly,
   volumeOptional = false,
   onAdd,
@@ -307,26 +309,39 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
                     <p className="font-mono font-bold text-hospital-600 text-[11px]">{recordVolLabel(r)}</p>
                   </div>
                   {!isReadOnly && (
-                    <div className="flex items-center gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => startEdit(r)}
-                        className="h-7 w-7 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-                        title="Editar"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDelete(r.id)}
-                        className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    currentUser?.role !== "CLINICAL" || r.registered_by_id === currentUser?.id ? (
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEdit(r)}
+                          className="h-7 w-7 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                          title="Editar"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(r.id)}
+                          className="h-7 w-7 text-slate-600 hover:bg-red-50 hover:text-red-600"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center pr-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Lock className="h-4 w-4 text-slate-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
+                            Somente o autor do registro ou administradores podem editá-lo
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    )
                   )}
                 </div>
               ))}

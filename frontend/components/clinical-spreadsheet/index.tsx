@@ -590,6 +590,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="INPUT"
                         title="Medicações & Infusões"
                         records={medsList}
+                        currentUser={currentUser}
                         isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
@@ -605,6 +606,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="INPUT"
                         title="Outras Entradas Hídricas"
                         records={otherInputList}
+                        currentUser={currentUser}
                         isReadOnly={isReadOnlyShift}
                         onAdd={handleAddMultiItemRecord}
                         onDelete={handleDeleteRecord}
@@ -686,6 +688,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="OUTPUT"
                         title="Drenos"
                         records={drainList}
+                        currentUser={currentUser}
                         isReadOnly={isReadOnlyShift}
                         volumeOptional
                         onAdd={handleAddMultiItemRecord}
@@ -702,6 +705,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="OUTPUT"
                         title="Fezes"
                         records={stoolList}
+                        currentUser={currentUser}
                         isReadOnly={isReadOnlyShift}
                         volumeOptional
                         onAdd={handleAddMultiItemRecord}
@@ -718,6 +722,7 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                         direction="OUTPUT"
                         title="Outras Saídas Hídricas"
                         records={otherOutputList}
+                        currentUser={currentUser}
                         isReadOnly={isReadOnlyShift}
                         volumeOptional
                         onAdd={handleAddMultiItemRecord}
@@ -836,8 +841,8 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
                   {totals.colSums["OTHER_INPUT"] ? `${totals.colSums["OTHER_INPUT"]} ml` : "—"}
                 </td>
                 <td className="p-1 text-center border-r border-slate-200 text-emerald-700 font-extrabold print:text-black print:border-black">
-                  {((totals.colSums["ORAL_DIET"] || 0) + (totals.colSums["ENTERAL_DIET"] || 0)) > 0
-                    ? `${(totals.colSums["ORAL_DIET"] || 0) + (totals.colSums["ENTERAL_DIET"] || 0)} ml`
+                  {((totals.colSums["ORAL_DIET"] || 0) + (totals.colSums["ENTERAL_DIET"] || 0) + (totals.colSums["PARENTERAL_NUTRITION"] || 0) + (totals.colSums["FILTERED_WATER"] || 0)) > 0
+                    ? `${(totals.colSums["ORAL_DIET"] || 0) + (totals.colSums["ENTERAL_DIET"] || 0) + (totals.colSums["PARENTERAL_NUTRITION"] || 0) + (totals.colSums["FILTERED_WATER"] || 0)} ml`
                     : "—"}
                 </td>
                 <td className="p-1 text-center border-r-2 border-r-emerald-300 text-emerald-700 font-extrabold print:text-black print:border-black">

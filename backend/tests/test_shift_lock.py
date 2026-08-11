@@ -70,12 +70,13 @@ def _create_fluid_record_in_db(
     occurred_at_str: str,
     category: str = "IV_HYDRATION",
     vol: float = 200.0,
+    registered_by_id: int = 1,
 ) -> int:
-    """Insert a FluidRecord directly via the shared test DB (as admin user=1)."""
+    """Insert a FluidRecord directly via the shared test DB."""
     db = _get_db()
     rec = FluidRecord(
         patient_id=patient_id,
-        registered_by_id=1,
+        registered_by_id=registered_by_id,
         direction=FluidDirection.INPUT,
         category=FluidType[category],
         volume_ml=vol,
@@ -88,12 +89,12 @@ def _create_fluid_record_in_db(
     return rid
 
 
-def _create_vitals_record_in_db(patient_id: int, occurred_at_str: str) -> int:
-    """Insert a VitalSignRecord directly via the shared test DB (as admin user=1)."""
+def _create_vitals_record_in_db(patient_id: int, occurred_at_str: str, registered_by_id: int = 1) -> int:
+    """Insert a VitalSignRecord directly via the shared test DB."""
     db = _get_db()
     rec = VitalSignRecord(
         patient_id=patient_id,
-        registered_by_id=1,
+        registered_by_id=registered_by_id,
         occurred_at=datetime.fromisoformat(occurred_at_str),
         pulse=72,
     )
@@ -226,7 +227,7 @@ class TestFluidShiftLock:
     def test_clinical_patch_current_shift_200(self, as_clinical, client):
         """Regression guard: CLINICAL CAN PATCH a record in the current open shift."""
         pid = _create_patient_in_db("LOCK-OPEN-01")
-        record_id = _create_fluid_record_in_db(pid, _today_shift_time(), category="URINE", vol=100)
+        record_id = _create_fluid_record_in_db(pid, _today_shift_time(), category="URINE", vol=100, registered_by_id=2)
         res = as_clinical.patch(f"/api/v1/balances/records/{record_id}", json={"volume_ml": 150})
         assert res.status_code == 200, res.text
 
@@ -280,6 +281,6 @@ class TestVitalsShiftLock:
     def test_clinical_vitals_current_shift_200(self, as_clinical, client):
         """Regression guard: CLINICAL CAN update vitals in the current open shift."""
         pid = _create_patient_in_db("VLOCK-OPEN-01")
-        record_id = _create_vitals_record_in_db(pid, _today_shift_time())
+        record_id = _create_vitals_record_in_db(pid, _today_shift_time(), registered_by_id=2)
         res = as_clinical.patch(f"/api/v1/vitals/records/{record_id}", json={"pulse": 88})
         assert res.status_code == 200, res.text

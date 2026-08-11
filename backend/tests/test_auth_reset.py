@@ -86,3 +86,32 @@ def test_reset_password_unknown_user(client):
 def test_reset_password_too_short(client):
     response = client.patch("/api/v1/auth/users/1/password", json={"new_password": "short"})
     assert response.status_code == 422
+
+def test_admin_cannot_reset_admin_password(client):
+    from app.main import app
+    from app.database import get_db
+    from app.models import User, UserRole
+    
+    # User 1 is the admin created by conftest.py
+    response = client.patch("/api/v1/auth/users/1/password", json={"new_password": "newpassword123"})
+    assert response.status_code == 403
+    assert "Administradores só podem alterar senhas" in response.json()["detail"]
+
+def test_developer_can_reset_admin_password(client):
+    from app.main import app
+    from app.security import get_current_user
+    from app.models import User, UserRole
+    
+    def override_developer():
+        return User(id=99, username="dev", role=UserRole.DEVELOPER, is_active=True)
+        
+    old_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_user] = override_developer
+    for dep in list(app.dependency_overrides.keys()):
+        if getattr(dep, "__name__", "") == "RoleChecker":
+            app.dependency_overrides[dep] = override_developer
+            
+    response = client.patch("/api/v1/auth/users/1/password", json={"new_password": "newpassword123"})
+    assert response.status_code == 204
+    
+    app.dependency_overrides = old_overrides

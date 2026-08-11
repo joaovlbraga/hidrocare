@@ -5,7 +5,8 @@ import { Calendar, User, Activity, Printer } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,7 @@ export default function RecordsPage() {
   const [patients, setPatients] = useState<Patient[] | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [selectedUnit, setSelectedUnit] = useState<string>("UTI 1");
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
@@ -32,6 +34,8 @@ export default function RecordsPage() {
       .then((data: Patient[]) => {
         setPatients(data);
         if (data.length > 0) {
+          const firstUnit = data[0].uti || "UTI 1";
+          setSelectedUnit(firstUnit);
           setSelectedPatientId(String(data[0].id));
         }
       })
@@ -42,6 +46,8 @@ export default function RecordsPage() {
   }, []);
 
   const loadingPatients = patients === null;
+  const units = Array.from(new Set((patients ?? []).map((p) => p.uti || "UTI 1"))).sort();
+  const activePatients = (patients ?? []).filter((p) => (p.uti || "UTI 1") === selectedUnit);
   const activePatient = (patients ?? []).find((p) => String(p.id) === selectedPatientId);
 
   return (
@@ -60,6 +66,32 @@ export default function RecordsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Unit Tabs */}
+            {!loadingPatients && units.length > 1 && (
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                {units.map((unit) => (
+                  <button
+                    key={unit}
+                    onClick={() => {
+                      setSelectedUnit(unit);
+                      const unitPatients = (patients ?? []).filter((p) => (p.uti || "UTI 1") === unit);
+                      if (unitPatients.length > 0 && !unitPatients.find((p) => String(p.id) === selectedPatientId)) {
+                        setSelectedPatientId(String(unitPatients[0].id));
+                      }
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                      selectedUnit === unit
+                        ? "bg-white text-hospital-700 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    {unit}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Patient Selector */}
             <div className="w-64 sm:w-72">
               {loadingPatients ? (
@@ -70,11 +102,14 @@ export default function RecordsPage() {
                     <SelectValue placeholder="Selecione um paciente..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(patients ?? []).map((patient) => (
-                      <SelectItem key={patient.id} value={String(patient.id)} className="text-xs">
-                        {patient.uti || "UTI 1"} — Leito {patient.bed} · {patient.full_name} ({patient.medical_record})
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      <SelectLabel>{selectedUnit}</SelectLabel>
+                      {activePatients.map((patient) => (
+                        <SelectItem key={patient.id} value={String(patient.id)} className="text-xs">
+                          Leito {patient.bed} · {patient.full_name} ({patient.medical_record})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               )}

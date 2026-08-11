@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import FluidDirection, FluidRecord, FluidType, Patient, User, VitalSignRecord
 from app.schemas import DailyBalance, DailySpreadsheetData, FluidRecordCreate, FluidRecordPublic, FluidRecordUpdate
-from app.security import assert_can_mutate_record, get_current_user
+from app.security import assert_can_mutate_record, assert_owns_record, get_current_user
 from app.utils.time_windows import get_clinical_shift_window
 
 router = APIRouter(prefix="/balances", tags=["Balanço hídrico"])
@@ -49,6 +49,7 @@ def create_record(payload: FluidRecordCreate, db: Session = Depends(get_db), cur
         if existing:
             # This is a functional edit — enforce shift-lock for CLINICAL users.
             assert_can_mutate_record(existing.occurred_at, current_user)
+            assert_owns_record(existing.registered_by_id, current_user)
             existing.volume_ml = vol_num
             existing.qualitative_value = qual_str
             if payload.notes is not None:
@@ -113,6 +114,7 @@ def update_record(record_id: int, payload: FluidRecordUpdate, db: Session = Depe
 
     # Enforce shift-lock before any mutation (including the delete-via-zero-volume branch).
     assert_can_mutate_record(record.occurred_at, current_user)
+    assert_owns_record(record.registered_by_id, current_user)
 
     if payload.volume_ml is None or str(payload.volume_ml).strip() in ("", "0"):
         # Hard-delete: no tombstone in this codebase, so we skip setting updated_by_id.
@@ -159,6 +161,7 @@ def delete_record(record_id: int, db: Session = Depends(get_db), current_user: U
     record = db.get(FluidRecord, record_id)
     if record:
         assert_can_mutate_record(record.occurred_at, current_user)
+        assert_owns_record(record.registered_by_id, current_user)
         db.delete(record)
         db.commit()
     return None

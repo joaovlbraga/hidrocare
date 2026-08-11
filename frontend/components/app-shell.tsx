@@ -12,7 +12,7 @@ import { DevToolsHider } from "@/components/devtools-hider";
 const navItems = [
   { href: "/", label: "Visão geral", icon: LayoutDashboard, roles: ["CLINICAL", "ADMIN", "DEVELOPER"] },
   { href: "/registros", label: "Registros", icon: ClipboardPlus, roles: ["CLINICAL", "ADMIN", "DEVELOPER"] },
-  { href: "/pacientes", label: "Pacientes", icon: UsersRound, roles: ["ADMIN"] },
+  { href: "/pacientes", label: "Pacientes", icon: UsersRound, roles: ["CLINICAL", "ADMIN", "DEVELOPER"] },
   { href: "/usuarios", label: "Usuários", icon: UserPlus, roles: ["ADMIN", "DEVELOPER"] },
 ];
 

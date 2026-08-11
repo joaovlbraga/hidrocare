@@ -18,7 +18,7 @@ def test_create_user_duplicate_username(client: TestClient):
         "full_name": "Another Admin",
         "email": "another@hospital.com",
         "password": "password123",
-        "role": "ADMIN"
+        "role": "CLINICAL"
     })
     assert response.status_code == 409
     assert response.json()["detail"] == "Já existe um usuário com este nome de usuário"
@@ -33,3 +33,60 @@ def test_create_user_success(client: TestClient):
     })
     assert response.status_code == 201
     assert response.json()["username"] == "newuser"
+
+def test_create_user_no_email_with_phone(client: TestClient):
+    response = client.post("/api/v1/auth/users", json={
+        "username": "phoneuser",
+        "full_name": "Phone User",
+        "email": None,
+        "phone": "(11) 99999-9999",
+        "password": "password123",
+        "role": "CLINICAL"
+    })
+    assert response.status_code == 201
+    assert response.json()["username"] == "phoneuser"
+    assert response.json()["phone"] == "(11) 99999-9999"
+    assert response.json()["email"] is None
+
+def test_admin_cannot_create_admin(client: TestClient):
+    response = client.post("/api/v1/auth/users", json={
+        "username": "admin2",
+        "full_name": "Admin 2",
+        "email": "admin2@hospital.com",
+        "password": "password123",
+        "role": "ADMIN"
+    })
+    assert response.status_code == 403
+    assert "Administradores só têm permissão" in response.json()["detail"]
+
+def test_admin_list_only_clinical(client: TestClient):
+    response = client.get("/api/v1/auth/users")
+    assert response.status_code == 200
+    users = response.json()
+    assert len(users) == 0 # no clinical users initially created in fixture
+
+def test_developer_can_create_admin(client: TestClient):
+    from app.main import app
+    from app.security import get_current_user
+    from app.models import User, UserRole
+    
+    def override_developer():
+        return User(id=99, username="dev", role=UserRole.DEVELOPER, is_active=True)
+        
+    
+    old_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_user] = override_developer
+    for dep in list(app.dependency_overrides.keys()):
+        if getattr(dep, "__name__", "") == "RoleChecker":
+            app.dependency_overrides[dep] = override_developer
+    
+    response = client.post("/api/v1/auth/users", json={
+        "username": "admin3",
+        "full_name": "Admin 3",
+        "email": "admin3@hospital.com",
+        "password": "password123",
+        "role": "ADMIN"
+    })
+    assert response.status_code == 201
+    
+    app.dependency_overrides = old_overrides
