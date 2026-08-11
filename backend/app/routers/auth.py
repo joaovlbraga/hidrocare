@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, UserRole
-from app.schemas import LoginRequest, Token, UserCreate, UserPublic
+from app.schemas import LoginRequest, PasswordResetRequest, Token, UserCreate, UserPublic
 from app.security import create_access_token, get_current_user, hash_password, require_roles, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -35,3 +35,22 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), _: User = De
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.get("/users", response_model=list[UserPublic])
+def list_users(db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.ADMIN, UserRole.DEVELOPER))):
+    return db.scalars(select(User).order_by(User.username)).all()
+
+
+@router.patch("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    user_id: int,
+    payload: PasswordResetRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.DEVELOPER)),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()

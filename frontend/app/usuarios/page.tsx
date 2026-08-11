@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { UserList } from "@/components/user-list";
 
 export default function UsersPage() {
   const [role, setRole] = useState("CLINICAL");
@@ -131,6 +132,7 @@ export default function UsersPage() {
           </Button>
         </form>
       </FormPanel>
+      <UserList />
     </AppShell>
   );
 }
