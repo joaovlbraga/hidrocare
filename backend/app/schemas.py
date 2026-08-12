@@ -46,6 +46,11 @@ class PasswordResetRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=72)
 
 
+class UpdateOwnPasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=72)
+
+
 class PatientCreate(BaseModel):
     medical_record: str = Field(min_length=1, max_length=60)
     full_name: str = Field(min_length=3, max_length=150)
@@ -263,3 +268,4 @@ class DailyBalance(BaseModel):
     balance_ml: int
     cumulative_balance: float
     status: str
+    qualitative_records: list[FluidRecordPublic] = []

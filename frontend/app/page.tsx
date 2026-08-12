@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/api";
 
 type Patient = { id: number; full_name: string; uti?: string; bed: string; medical_record: string; is_admitted: boolean };
-type DailyBalance = { patient_id: number; date: string; input_ml: number; output_ml: number; balance_ml: number; status: string };
+type DailyBalance = { patient_id: number; date: string; input_ml: number; output_ml: number; balance_ml: number; status: string; qualitative_records: FluidRecord[] };
 
 type FluidRecord = {
   id: number;
@@ -92,15 +92,7 @@ export default function DashboardPage() {
           list.map(async (patient) => {
             try {
               const balance: DailyBalance = await apiFetch(`/balances/patients/${patient.id}/daily?target_date=${todayIso()}`);
-              let qualitativeRecords: FluidRecord[] = [];
-              try {
-                const recordsData = await apiFetch(`/balances/patients/${patient.id}/records?target_date=${todayIso()}`);
-                if (recordsData && recordsData.fluids) {
-                  qualitativeRecords = recordsData.fluids.filter((r: FluidRecord) => r.qualitative_value);
-                }
-              } catch {
-                // Ignore failure for individual records fetch
-              }
+              const qualitativeRecords: FluidRecord[] = balance.qualitative_records || [];
               return { ...patient, balance, qualitativeRecords };
             } catch {
               return { ...patient, balance: null, qualitativeRecords: [] };

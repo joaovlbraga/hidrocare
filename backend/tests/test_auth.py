@@ -90,3 +90,130 @@ def test_developer_can_create_admin(client: TestClient):
     assert response.status_code == 201
     
     app.dependency_overrides = old_overrides
+
+
+def test_update_own_password_success(client: TestClient):
+    from app.main import app
+    from app.security import get_current_user
+    from app.models import User, UserRole
+    
+    # We must remove the conftest.py override of get_current_user
+    # so that the real token-based lookup occurs, and the user is attached to the DB session.
+    old_overrides = app.dependency_overrides.copy()
+    
+    def override_developer():
+        return User(id=99, username="dev", role=UserRole.DEVELOPER, is_active=True)
+    
+    app.dependency_overrides[get_current_user] = override_developer
+    for dep in list(app.dependency_overrides.keys()):
+        if getattr(dep, "__name__", "") == "RoleChecker":
+            app.dependency_overrides[dep] = override_developer
+
+    client.post("/api/v1/auth/users", json={
+        "username": "tester1",
+        "full_name": "Tester",
+        "password": "password123",
+        "role": "CLINICAL"
+    })
+    
+    # Now remove the override completely to use real token logic
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+    login = client.post("/api/v1/auth/login", json={"username": "tester1", "password": "password123"})
+    token = login.json()["access_token"]
+    
+    response = client.patch(
+        "/api/v1/auth/me/password", 
+        json={"current_password": "password123", "new_password": "newpassword123"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 204
+    
+    login2 = client.post("/api/v1/auth/login", json={"username": "tester1", "password": "password123"})
+    assert login2.status_code == 401
+    
+    login3 = client.post("/api/v1/auth/login", json={"username": "tester1", "password": "newpassword123"})
+    assert login3.status_code == 200
+
+    app.dependency_overrides = old_overrides
+
+
+def test_update_own_password_wrong_current(client: TestClient):
+    from app.main import app
+    from app.security import get_current_user
+    from app.models import User, UserRole
+    
+    old_overrides = app.dependency_overrides.copy()
+    
+    def override_developer():
+        return User(id=99, username="dev", role=UserRole.DEVELOPER, is_active=True)
+    
+    app.dependency_overrides[get_current_user] = override_developer
+    for dep in list(app.dependency_overrides.keys()):
+        if getattr(dep, "__name__", "") == "RoleChecker":
+            app.dependency_overrides[dep] = override_developer
+
+    client.post("/api/v1/auth/users", json={
+        "username": "tester2",
+        "full_name": "Tester",
+        "password": "password123",
+        "role": "CLINICAL"
+    })
+    
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+    login = client.post("/api/v1/auth/login", json={"username": "tester2", "password": "password123"})
+    token = login.json()["access_token"]
+    
+    response = client.patch(
+        "/api/v1/auth/me/password", 
+        json={"current_password": "wrongpassword", "new_password": "newpassword123"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 401
+    
+    login2 = client.post("/api/v1/auth/login", json={"username": "tester2", "password": "password123"})
+    assert login2.status_code == 200
+
+    app.dependency_overrides = old_overrides
+
+
+def test_update_own_password_too_short(client: TestClient):
+    from app.main import app
+    from app.security import get_current_user
+    from app.models import User, UserRole
+    
+    old_overrides = app.dependency_overrides.copy()
+    
+    def override_developer():
+        return User(id=99, username="dev", role=UserRole.DEVELOPER, is_active=True)
+    
+    app.dependency_overrides[get_current_user] = override_developer
+    for dep in list(app.dependency_overrides.keys()):
+        if getattr(dep, "__name__", "") == "RoleChecker":
+            app.dependency_overrides[dep] = override_developer
+
+    client.post("/api/v1/auth/users", json={
+        "username": "tester3",
+        "full_name": "Tester",
+        "password": "password123",
+        "role": "CLINICAL"
+    })
+    
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+    login = client.post("/api/v1/auth/login", json={"username": "tester3", "password": "password123"})
+    token = login.json()["access_token"]
+    
+    response = client.patch(
+        "/api/v1/auth/me/password", 
+        json={"current_password": "password123", "new_password": "short"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 422
+    
+    app.dependency_overrides = old_overrides
+

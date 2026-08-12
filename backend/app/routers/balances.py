@@ -189,6 +189,17 @@ def daily_balance(patient_id: int, target_date: date, db: Session = Depends(get_
         ).where(FluidRecord.patient_id == patient_id, FluidRecord.occurred_at < end)
     ).one()
 
+    qualitative_records = db.scalars(
+        select(FluidRecord)
+        .where(
+            FluidRecord.patient_id == patient_id,
+            FluidRecord.occurred_at >= start,
+            FluidRecord.occurred_at < end,
+            FluidRecord.qualitative_value.isnot(None),
+        )
+        .order_by(FluidRecord.occurred_at.asc(), FluidRecord.id.asc())
+    ).all()
+
     input_ml = int(totals[0])
     output_ml = int(totals[1])
     balance_ml = input_ml - output_ml
@@ -202,5 +213,6 @@ def daily_balance(patient_id: int, target_date: date, db: Session = Depends(get_
         balance_ml=balance_ml,
         cumulative_balance=cumulative_balance,
         status=status_str,
+        qualitative_records=qualitative_records,
     )
 

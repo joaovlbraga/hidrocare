@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, UserRole
-from app.schemas import LoginRequest, PasswordResetRequest, Token, UserCreate, UserPublic
+from app.schemas import LoginRequest, PasswordResetRequest, Token, UserCreate, UserPublic, UpdateOwnPasswordRequest
 from app.security import create_access_token, get_current_user, hash_password, require_roles, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -21,6 +21,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserPublic)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def update_own_password(
+    payload: UpdateOwnPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha atual incorreta")
+    
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
 
 
 @router.post("/users", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
