@@ -191,3 +191,34 @@ def test_patient_uti_bed_crud_and_filtering(client):
     assert res_patch.json()["bed"] == "05"
     assert res_patch.json()["uti"] == "UTI 2"
 
+
+def test_patient_sanitization(client):
+    """Verify that patient name keeps natural casing and bed is zero-padded on create and update."""
+    # Test Create
+    res_create = client.post(
+        "/api/v1/patients",
+        json={
+            "medical_record": "REC-SAN-1",
+            "full_name": "joao teste",
+            "birth_date": "1990-01-01",
+            "bed": "3",
+        },
+    )
+    assert res_create.status_code == 201
+    p = res_create.json()
+    assert p["full_name"] == "joao teste"
+    assert p["bed"] == "03"
+
+    # Test Update
+    res_patch = client.patch(
+        f"/api/v1/patients/{p['id']}",
+        json={
+            "full_name": " maria da silva ",
+            "bed": " 5 ",
+        },
+    )
+    assert res_patch.status_code == 200
+    p_upd = res_patch.json()
+    assert p_upd["full_name"] == "maria da silva"
+    assert p_upd["bed"] == "05"
+

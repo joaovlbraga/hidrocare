@@ -54,13 +54,18 @@ class PatientCreate(BaseModel):
     bed: str = Field(min_length=1, max_length=50)
     health_insurance: str = Field(default="SUS", min_length=1, max_length=100)
 
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def sanitize_full_name(cls, v: str) -> str:
+        return str(v).strip()
+
     @field_validator("bed", mode="before")
     @classmethod
     def validate_bed(cls, v: str) -> str:
         s = str(v).strip()
         if not s:
             raise ValueError("Leito não pode ser vazio")
-        return s
+        return s.zfill(2)
 
 
 class PatientUpdate(BaseModel):
@@ -70,6 +75,13 @@ class PatientUpdate(BaseModel):
     bed: str | None = Field(default=None, min_length=1, max_length=50)
     health_insurance: str | None = Field(default=None, min_length=1, max_length=100)
 
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def sanitize_full_name_update(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return str(v).strip()
+
     @field_validator("bed", mode="before")
     @classmethod
     def validate_bed_update(cls, v: str | None) -> str | None:
@@ -78,7 +90,7 @@ class PatientUpdate(BaseModel):
         s = str(v).strip()
         if not s:
             raise ValueError("Leito não pode ser vazio")
-        return s
+        return s.zfill(2)
 
 
 class PatientPublic(PatientCreate):

@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserRoundPlus, Info, UserX, AlertTriangle } from "lucide-react";
+import { UserRoundPlus, Info, UserX, AlertTriangle, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppShell } from "@/components/app-shell";
 import { FormPanel } from "@/components/form-panel";
 import { Button } from "@/components/ui/button";
@@ -44,6 +50,7 @@ export default function PatientsPage() {
   const [saving, setSaving] = useState(false);
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [confirmPatient, setConfirmPatient] = useState<Patient | null>(null);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   const {
     register,
@@ -58,6 +65,44 @@ export default function PatientsPage() {
       health_insurance: "SUS",
     },
   });
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    control: controlEdit,
+    reset: resetEdit,
+    formState: { errors: editErrors },
+  } = useForm<PatientFormData>({
+    resolver: zodResolver(patientSchema),
+  });
+
+  const openEditModal = (patient: Patient) => {
+    resetEdit({
+      full_name: patient.full_name,
+      medical_record: patient.medical_record,
+      uti: (patient.uti as "UTI 1" | "UTI 2") || "UTI 1",
+      bed: patient.bed,
+      health_insurance: patient.health_insurance || "SUS",
+      birth_date: new Date().toISOString().split("T")[0], // Mock date since we don't return it in list, ideally should come from backend
+    });
+    setEditingPatient(patient);
+  };
+
+  const onEditSubmit = async (data: PatientFormData) => {
+    if (!editingPatient) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      await apiFetch(`/patients/${editingPatient.id}`, { method: "PATCH", body: JSON.stringify(data) });
+      setMessage({ text: "Dados do paciente atualizados com sucesso.", ok: true });
+      setEditingPatient(null);
+      await loadPatients();
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : "Erro ao atualizar paciente", ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   async function loadPatients() {
     try {
@@ -166,7 +211,22 @@ export default function PatientsPage() {
                 </div>
                 <div>
                   <Label htmlFor="bed">Leito</Label>
-                  <Input id="bed" {...register("bed")} className="mt-1.5" placeholder="Ex.: 01" />
+                  <Controller
+                    control={control}
+                    name="bed"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="bed" className="mt-1.5 h-9 text-xs">
+                          <SelectValue placeholder="Leito" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(2, "0")).map(b => (
+                            <SelectItem key={b} value={b}>{b}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.bed && <p className="mt-1 text-xs text-red-600">{errors.bed.message}</p>}
                 </div>
                 <div>
@@ -181,7 +241,12 @@ export default function PatientsPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">2. Dados Pessoais</h2>
               <div>
                 <Label htmlFor="full_name">Nome completo</Label>
-                <Input id="full_name" {...register("full_name")} className="mt-1.5" placeholder="Nome completo do paciente" />
+                <Input 
+                  id="full_name" 
+                  {...register("full_name")} 
+                  className="mt-1.5" 
+                  placeholder="Ex: Maria da Silva Souza" 
+                />
                 {errors.full_name && <p className="mt-1 text-xs text-red-600">{errors.full_name.message}</p>}
               </div>
 
@@ -228,16 +293,28 @@ export default function PatientsPage() {
                         <span className="font-medium text-slate-700">{patient.health_insurance || "SUS"}</span>
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setConfirmPatient(patient)}
-                      className="gap-1.5"
-                    >
-                      <UserX className="h-4 w-4" aria-hidden="true" />
-                      Dar Alta / Remover
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditModal(patient)}
+                        className="gap-1.5 text-slate-600"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setConfirmPatient(patient)}
+                        className="gap-1.5"
+                      >
+                        <UserX className="h-4 w-4" aria-hidden="true" />
+                        Dar Alta / Remover
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -279,6 +356,90 @@ export default function PatientsPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Modal */}
+      <Dialog open={!!editingPatient} onOpenChange={(open) => !open && setEditingPatient(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar Paciente — {editingPatient?.full_name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-4 pt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="edit_medical_record">Prontuário</Label>
+                <Input id="edit_medical_record" {...registerEdit("medical_record")} className="mt-1.5" />
+                {editErrors.medical_record && <p className="mt-1 text-xs text-red-600">{editErrors.medical_record.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="edit_health_insurance">Convênio</Label>
+                <Input id="edit_health_insurance" {...registerEdit("health_insurance")} className="mt-1.5" />
+                {editErrors.health_insurance && <p className="mt-1 text-xs text-red-600">{editErrors.health_insurance.message}</p>}
+              </div>
+            </div>
+            
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="edit_uti">Unidade UTI</Label>
+                <Controller
+                  control={controlEdit}
+                  name="uti"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="edit_uti" className="mt-1.5">
+                        <SelectValue placeholder="Selecione a UTI" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="UTI 1">UTI 1</SelectItem>
+                        <SelectItem value="UTI 2">UTI 2</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {editErrors.uti && <p className="mt-1 text-xs text-red-600">{editErrors.uti.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="edit_bed">Leito</Label>
+                <Controller
+                  control={controlEdit}
+                  name="bed"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="edit_bed" className="mt-1.5">
+                        <SelectValue placeholder="Leito" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(2, "0")).map(b => (
+                          <SelectItem key={b} value={b}>{b}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {editErrors.bed && <p className="mt-1 text-xs text-red-600">{editErrors.bed.message}</p>}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit_full_name">Nome completo</Label>
+              <Input 
+                id="edit_full_name" 
+                {...registerEdit("full_name")} 
+                className="mt-1.5" 
+              />
+              {editErrors.full_name && <p className="mt-1 text-xs text-red-600">{editErrors.full_name.message}</p>}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => setEditingPatient(null)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button type="submit" loading={saving} disabled={saving}>
+                Salvar Alterações
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

@@ -13,7 +13,39 @@ import { apiFetch } from "@/lib/api";
 
 type Patient = { id: number; full_name: string; uti?: string; bed: string; medical_record: string; is_admitted: boolean };
 type DailyBalance = { patient_id: number; date: string; input_ml: number; output_ml: number; balance_ml: number; status: string };
-type PatientBalance = Patient & { balance: DailyBalance | null };
+
+type FluidRecord = {
+  id: number;
+  category: string;
+  volume_ml: number | string | null;
+  qualitative_value: string | null;
+  notes: string | null;
+  occurred_at: string;
+};
+
+type PatientBalance = Patient & { balance: DailyBalance | null; qualitativeRecords?: FluidRecord[] };
+
+const categoryLabels: Record<string, string> = {
+  ORAL_DIET: "Dieta Oral",
+  ENTERAL_DIET: "SNE",
+  PARENTERAL_NUTRITION: "NPT",
+  FILTERED_WATER: "H₂O",
+  IV_HYDRATION: "Hidratação IV",
+  MEDICATION: "Medicação",
+  TRANSFUSION: "Transfusão",
+  OTHER_INPUT: "Outro (Ganho)",
+  URINE: "Diurese",
+  STOOL: "Fezes",
+  VOMIT: "Vômito",
+  DRAIN: "Dreno",
+  BLEEDING: "Sangramento",
+  OTHER_OUTPUT: "Outro (Perda)",
+  SNE_SNG: "SNE/SNG"
+};
+
+function formatCategory(category: string) {
+  return categoryLabels[category] || category;
+}
 
 const WARNING_THRESHOLD_ML = 500;
 const CRITICAL_THRESHOLD_ML = 1500;
@@ -60,9 +92,18 @@ export default function DashboardPage() {
           list.map(async (patient) => {
             try {
               const balance: DailyBalance = await apiFetch(`/balances/patients/${patient.id}/daily?target_date=${todayIso()}`);
-              return { ...patient, balance };
+              let qualitativeRecords: FluidRecord[] = [];
+              try {
+                const recordsData = await apiFetch(`/balances/patients/${patient.id}/records?target_date=${todayIso()}`);
+                if (recordsData && recordsData.fluids) {
+                  qualitativeRecords = recordsData.fluids.filter((r: FluidRecord) => r.qualitative_value);
+                }
+              } catch {
+                // Ignore failure for individual records fetch
+              }
+              return { ...patient, balance, qualitativeRecords };
             } catch {
-              return { ...patient, balance: null };
+              return { ...patient, balance: null, qualitativeRecords: [] };
             }
           })
         );
@@ -259,31 +300,45 @@ export default function DashboardPage() {
                   {filteredPatients.map((patient) => {
                     const severity = patient.balance ? severityOf(patient.balance.balance_ml) : null;
                     return (
-                      <li key={patient.id} className="flex items-center justify-between gap-3 py-3.5">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-hospital-100/70 px-2 py-0.5 font-mono text-xs font-bold text-hospital-900 border border-hospital-200 shrink-0">
-                              {patient.uti || "UTI 1"} · Leito {patient.bed}
-                            </span>
+                      <li key={patient.id} className="flex flex-col gap-3 py-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded bg-hospital-100/70 px-2 py-0.5 font-mono text-xs font-bold text-hospital-900 border border-hospital-200 shrink-0">
+                                {patient.uti || "UTI 1"} · Leito {patient.bed}
+                              </span>
+                            </div>
+                            <p className="truncate font-semibold text-slate-900 mt-1">{patient.full_name}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Prontuário: <span className="font-mono text-slate-700">{patient.medical_record}</span>
+                              {patient.balance && (
+                                <>
+                                  {" · 24h: "}
+                                  <span className="font-semibold text-slate-800">{formatMl(patient.balance.balance_ml)}</span>
+                                </>
+                              )}
+                            </p>
                           </div>
-                          <p className="truncate font-semibold text-slate-900 mt-1">{patient.full_name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Prontuário: <span className="font-mono text-slate-700">{patient.medical_record}</span>
-                            {patient.balance && (
-                              <>
-                                {" · 24h: "}
-                                <span className="font-semibold text-slate-800">{formatMl(patient.balance.balance_ml)}</span>
-                              </>
-                            )}
-                          </p>
+                          {severity ? (
+                            <Badge variant={severity} className="shrink-0">
+                              <StatusDot variant={severity} />
+                              {severityLabel[severity]}
+                            </Badge>
+                          ) : (
+                            <Badge variant="neutral" className="shrink-0">Sem registro</Badge>
+                          )}
                         </div>
-                        {severity ? (
-                          <Badge variant={severity} className="shrink-0">
-                            <StatusDot variant={severity} />
-                            {severityLabel[severity]}
-                          </Badge>
-                        ) : (
-                          <Badge variant="neutral" className="shrink-0">Sem registro</Badge>
+                        {patient.qualitativeRecords && patient.qualitativeRecords.length > 0 && (
+                          <div className="mt-1 border-t pt-2">
+                            <span className="text-xs font-medium text-muted-foreground">Registros Qualitativos (24h):</span>
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {patient.qualitativeRecords.map((r) => (
+                                <Badge key={r.id} className="font-semibold" variant="neutral" title={r.notes || ""}>
+                                  {formatCategory(r.category)}: {r.qualitative_value}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </li>
                     );
