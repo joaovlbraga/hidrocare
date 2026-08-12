@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, TrendingUp, Users, Building2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -83,11 +84,26 @@ function naturalSortBed(aBed: string, bBed: string): number {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [patients, setPatients] = useState<PatientBalance[] | null>(null);
   const [error, setError] = useState("");
   const [activeUtiTab, setActiveUtiTab] = useState<"UTI 1" | "UTI 2">("UTI 1");
 
   useEffect(() => {
+    const token = sessionStorage.getItem("access_token");
+
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    setIsAuthenticated(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
     let cancelled = false;
 
     async function load() {
@@ -118,7 +134,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const loading = patients === null;
 
@@ -144,6 +160,14 @@ export default function DashboardPage() {
       entradas: p.balance.input_ml,
       saidas: p.balance.output_ml,
     }));
+
+  if (isAuthenticated === null) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <AppShell>

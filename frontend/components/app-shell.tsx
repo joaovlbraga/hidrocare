@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { ClipboardPlus, Droplets, LayoutDashboard, LogOut, Menu, UserPlus, UsersRound, X, KeyRound, User as UserIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -28,23 +28,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [pwdError, setPwdError] = useState("");
   const [pwdSuccess, setPwdSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const pathname = usePathname();
-  const router = useRouter();
   const role = user?.role;
 
   useEffect(() => {
-    const token = sessionStorage.getItem("access_token");
-    if (!token) {
-      router.replace("/login");
-    } else {
-      setIsAuthorized(true);
-      apiFetch("/auth/me")
-        .then((u: any) => setUser(u))
-        .catch(() => undefined);
-    }
-  }, [router]);
+    apiFetch("/auth/me")
+      .then((u: any) => setUser(u))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (role === "CLINICAL" && pathname === "/usuarios") {
@@ -111,10 +103,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const roleLabel = role === "ADMIN" ? "Administrador" : role === "CLINICAL" ? "Enfermeiro" : role === "DEVELOPER" ? "Desenvolvedor" : "Profissional";
-
-  if (isAuthorized === null) {
-    return null; // Bloqueia a renderização do layout até que a autorização seja validada.
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 lg:flex print:bg-white print:min-h-0">
