@@ -179,18 +179,25 @@ export const NutritionSheetCell = React.memo(function NutritionSheetCell({
             <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
               {records.map((r) => (
                 <div key={r.id} className="flex items-center justify-between rounded-md border bg-slate-50 p-2.5 text-xs">
-                  <div className="space-y-0.5 max-w-[240px]">
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                        {r.category === "ORAL_DIET" ? "Dieta Oral" :
-                         r.category === "ENTERAL_DIET" ? "Dieta Enteral" :
-                         r.category === "PARENTERAL_NUTRITION" ? "NPT" :
-                         r.category === "FILTERED_WATER" ? "Água Filtrada" : r.category}
-                      </span>
-                      <span className="font-mono font-bold text-slate-900">{r.volume_ml} ml</span>
-                    </div>
-                    {r.notes && <p className="text-[11px] text-slate-600 truncate">{r.notes}</p>}
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="space-y-0.5 max-w-[240px] cursor-help">
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            {r.category === "ORAL_DIET" ? "Dieta Oral" :
+                             r.category === "ENTERAL_DIET" ? "Dieta Enteral" :
+                             r.category === "PARENTERAL_NUTRITION" ? "NPT" :
+                             r.category === "FILTERED_WATER" ? "Água Filtrada" : r.category}
+                          </span>
+                          <span className="font-mono font-bold text-slate-900">{r.volume_ml} ml</span>
+                        </div>
+                        {r.notes && <p className="text-[11px] text-slate-600 truncate">{r.notes}</p>}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Lançado por @{r.registered_by_name || "Desconhecido"}
+                    </TooltipContent>
+                  </Tooltip>
                   {!isReadOnly && (
                     <Button
                       variant="ghost"

@@ -304,10 +304,17 @@ export const MultiItemSheetCell = React.memo(function MultiItemSheetCell({
                     editingId === r.id && "border-blue-300 bg-blue-50"
                   )}
                 >
-                  <div className="space-y-0.5 max-w-[200px]">
-                    <p className="font-semibold text-slate-800 truncate">{r.notes || "Sem descrição"}</p>
-                    <p className="font-mono font-bold text-hospital-600 text-[11px]">{recordVolLabel(r)}</p>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="space-y-0.5 max-w-[200px] cursor-help">
+                        <p className="font-semibold text-slate-800 truncate">{r.notes || "Sem descrição"}</p>
+                        <p className="font-mono font-bold text-hospital-600 text-[11px]">{recordVolLabel(r)}</p>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Lançado por @{r.registered_by_name || "Desconhecido"}
+                    </TooltipContent>
+                  </Tooltip>
                   {!isReadOnly && (
                     currentUser?.role !== "CLINICAL" || r.registered_by_id === currentUser?.id ? (
                       <div className="flex items-center gap-0.5">

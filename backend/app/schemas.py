@@ -181,6 +181,7 @@ class FluidRecordPublic(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime | None = None
+    registered_by_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
@@ -193,6 +194,8 @@ class FluidRecordPublic(BaseModel):
             if isinstance(vol, float) and vol.is_integer():
                 formatted_vol = int(vol)
             
+            author_name = getattr(data.registered_by, "username", None) if hasattr(data, "registered_by") and data.registered_by else None
+
             if vol is not None:
                 return {
                     "id": data.id,
@@ -207,6 +210,7 @@ class FluidRecordPublic(BaseModel):
                     "notes": data.notes,
                     "created_at": data.created_at,
                     "updated_at": getattr(data, "updated_at", None),
+                    "registered_by_name": author_name,
                 }
             elif qual:
                 return {
@@ -222,6 +226,7 @@ class FluidRecordPublic(BaseModel):
                     "notes": data.notes,
                     "created_at": data.created_at,
                     "updated_at": getattr(data, "updated_at", None),
+                    "registered_by_name": author_name,
                 }
         return data
 

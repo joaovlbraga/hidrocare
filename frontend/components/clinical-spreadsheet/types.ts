@@ -11,6 +11,7 @@ export type FluidRecord = {
   notes: string | null;
   created_at: string;
   updated_at?: string | null;
+  registered_by_name?: string | null;
 };
 
 export type DailySpreadsheetPayload = {

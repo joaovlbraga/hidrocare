@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import FluidDirection, FluidRecord, FluidType, Patient, User, VitalSignRecord
@@ -92,6 +92,7 @@ def list_patient_records(patient_id: int, target_date: date, db: Session = Depen
             FluidRecord.occurred_at >= start,
             FluidRecord.occurred_at < end,
         )
+        .options(selectinload(FluidRecord.registered_by))
         .order_by(FluidRecord.occurred_at.asc(), FluidRecord.id.asc())
     ).all()
     vitals = db.scalars(
@@ -197,6 +198,7 @@ def daily_balance(patient_id: int, target_date: date, db: Session = Depends(get_
             FluidRecord.occurred_at < end,
             FluidRecord.qualitative_value.isnot(None),
         )
+        .options(selectinload(FluidRecord.registered_by))
         .order_by(FluidRecord.occurred_at.asc(), FluidRecord.id.asc())
     ).all()
 
