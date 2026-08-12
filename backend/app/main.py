@@ -15,7 +15,7 @@ app = FastAPI(title="API Balanço Hídrico", version="0.1.0")
 # Em produção, substitua por uma lista explícita do domínio HTTPS da instituição.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "https://hidrocare.vercel.app"],
     allow_origin_regex=r"^http://192\.168\.\d{1,3}\.\d{1,3}:3000$",
     allow_credentials=True,
     allow_methods=["*"],
