@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) 2026 João Vitor de Lima Braga. All rights reserved.
+ * This software is the confidential and proprietary information of João Vitor de Lima Pellegrini Braga.
+ * System: HidroCare
+ */
+
 // Always use a relative path so the browser fetches from the same host/port
 // as the Next.js server — which then proxies to the FastAPI backend via the
 // rewrite rule in next.config.ts.

@@ -1,9 +1,13 @@
+# Copyright (c) 2026 João Vitor de Lima Braga. All rights reserved.
+# This software is the confidential and proprietary information of João Vitor de Lima Pellegrini Braga.
+# System: HidroCare
+
 import enum
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, column, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import expression
+from sqlalchemy.sql import func
 
 from app.database import Base
 

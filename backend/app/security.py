@@ -1,3 +1,7 @@
+# Copyright (c) 2026 João Vitor de Lima Braga. All rights reserved.
+# This software is the confidential and proprietary information of João Vitor de Lima Pellegrini Braga.
+# System: HidroCare
+
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, status

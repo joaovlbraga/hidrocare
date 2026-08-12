@@ -41,7 +41,7 @@ describe("UAT E2E: Print Layout Integrity & 15+ Itemized Medications", () => {
     render(<RecordsPage />);
     
     await new Promise((r) => setTimeout(r, 1000));
-    console.log(document.body.innerHTML);
+
 
     expect(
       await screen.findByText((content) =>

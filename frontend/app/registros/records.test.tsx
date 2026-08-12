@@ -217,7 +217,7 @@ describe("RecordsPage ICU Data Grid & Print Layout", () => {
     render(<RecordsPage />);
     
     await new Promise((r) => setTimeout(r, 1000));
-    console.log(document.body.innerHTML);
+
 
     expect(await screen.findByDisplayValue("++")).toBeInTheDocument();
     expect(screen.getAllByText("500 ml").length).toBeGreaterThan(0);
