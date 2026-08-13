@@ -57,6 +57,7 @@ export default function PatientsPage() {
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
@@ -71,10 +72,17 @@ export default function PatientsPage() {
     handleSubmit: handleEditSubmit,
     control: controlEdit,
     reset: resetEdit,
+    watch: watchEdit,
     formState: { errors: editErrors },
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
   });
+
+  const selectedUti = watch("uti");
+  const occupiedBedsCreate = patients?.filter(p => (p.uti || "UTI 1") === selectedUti).map(p => p.bed) || [];
+
+  const selectedEditUti = watchEdit("uti");
+  const occupiedBedsEdit = patients?.filter(p => (p.uti || "UTI 1") === selectedEditUti && p.id !== editingPatient?.id).map(p => p.bed) || [];
 
   const openEditModal = (patient: Patient) => {
     resetEdit({
@@ -221,7 +229,9 @@ export default function PatientsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(2, "0")).map(b => (
-                            <SelectItem key={b} value={b}>{b}</SelectItem>
+                            <SelectItem key={b} value={b} disabled={occupiedBedsCreate.includes(b)}>
+                              {b} {occupiedBedsCreate.includes(b) ? "(Ocupado)" : ""}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -409,7 +419,9 @@ export default function PatientsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(2, "0")).map(b => (
-                          <SelectItem key={b} value={b}>{b}</SelectItem>
+                          <SelectItem key={b} value={b} disabled={occupiedBedsEdit.includes(b)}>
+                            {b} {occupiedBedsEdit.includes(b) ? "(Ocupado)" : ""}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

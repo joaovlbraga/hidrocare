@@ -24,7 +24,16 @@ describe("PatientsPage with Convênio", () => {
     expect(screen.getByLabelText(/convênio/i)).toHaveValue("SUS");
 
     fireEvent.change(screen.getByLabelText(/prontuário/i), { target: { value: "REC123" } });
-    fireEvent.change(screen.getByLabelText(/leito/i), { target: { value: "UTI 01" } });
+    
+    // For Radix Select, we need to click the trigger and then the item
+    const utiTrigger = screen.getByRole("combobox", { name: /unidade uti/i });
+    fireEvent.click(utiTrigger);
+    fireEvent.click(screen.getByRole("option", { name: "UTI 1" }));
+
+    const bedTrigger = screen.getByRole("combobox", { name: /leito/i });
+    fireEvent.click(bedTrigger);
+    fireEvent.click(screen.getByRole("option", { name: "01" }));
+
     fireEvent.change(screen.getByLabelText(/convênio/i), { target: { value: "Unimed" } });
     fireEvent.change(screen.getByLabelText(/nome completo/i), { target: { value: "João Silva" } });
     fireEvent.change(screen.getByLabelText(/data de nascimento/i), { target: { value: "1990-01-01" } });
@@ -39,7 +48,7 @@ describe("PatientsPage with Convênio", () => {
           body: JSON.stringify({
             medical_record: "REC123",
             uti: "UTI 1",
-            bed: "UTI 01",
+            bed: "01",
             health_insurance: "Unimed",
             full_name: "João Silva",
             birth_date: "1990-01-01",
