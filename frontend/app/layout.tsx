@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2026 João Vitor de Lima Braga. All rights reserved.
+ * Copyright (c) 2026 João Vitor de Lima Pellegrini Braga. All rights reserved.
  * This software is the confidential and proprietary information of João Vitor de Lima Pellegrini Braga.
  * System: HidroCare
  */
