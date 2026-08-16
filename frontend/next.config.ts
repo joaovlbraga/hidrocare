@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Whitelist LAN IPs that are allowed to access the Next.js dev server.
+  // Without this, requests from other devices on the network are blocked with 403.
+  allowedDevOrigins: ["192.168.1.206"],
+
   async rewrites() {
     // Proxy /api/v1/* → the FastAPI backend.
     // This way the browser always calls a relative path (same host/port as the
