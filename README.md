@@ -1,121 +1,101 @@
 # HidroCare
 
-**Sistema de Gestão, Monitoramento e Auditoria de Balanço Hídrico para Unidades de Terapia Intensiva (UTI)**
+Sistema clínico para gestão, monitoramento e auditoria de balanço hídrico em Unidades de
+Terapia Intensiva (UTI).
 
-O HidroCare é uma plataforma clínica desenvolvida para digitalizar, padronizar e auditar o processo de registro de balanço hídrico em pacientes críticos. Projetado para substituir controles manuais por uma solução rastreável e orientada à tomada de decisão, o sistema garante precisão matemática e conformidade estrita com os protocolos da enfermagem intensivista.
+A ideia surgiu de um problema bem concreto: o controle de balanço hídrico em UTI ainda é feito,
+em muitos lugares, em papel ou em planilhas soltas — processo sujeito a erro de soma, difícil de
+auditar e sem rastreabilidade. O HidroCare digitaliza esse fluxo mantendo a lógica clínica real
+usada pela enfermagem intensivista, com precisão matemática no cálculo e histórico auditável de
+cada lançamento.
 
----
+## Funcionalidades e regras clínicas
 
-## Funcionalidades e Regras Clínicas
+**Balanço hídrico e agregações**
+- Cálculo do saldo hídrico em tempo real, por período de 24h.
+- Saldo acumulado desde a admissão do paciente.
+- Suporte a registros qualitativos de perdas não mensuráveis em volume (`+`, `++`, `+++`), que
+  entram no prontuário sem interferir no cálculo numérico do balanço.
 
-### Balanço Hídrico e Agregações
-* **Cálculo de 24 Horas:** Processamento em tempo real do saldo hídrico diário.
-* **Saldo Acumulado:** Rastreamento contínuo desde a admissão do paciente.
-* **Registros Qualitativos:** Suporte a perdas não mensuráveis em volume (`+`, `++`, `+++`). A arquitetura garante que estas entradas sejam registradas no prontuário físico sem interferir nas operações matemáticas do balanço numérico.
+**Fronteira de plantão (shift boundary)**
 
-### Fronteira de Plantão (Shift Boundary)
-O sistema implementa nativamente a regra operacional de UTIs, tratando o plantão como uma unidade de trabalho independente:
-* **Início:** 07:00
-* **Encerramento:** 06:59 do dia subsequente.
-Isso garante que os eventos e métricas de fechamento sejam alocados no período assistencial correto, independente da virada do calendário.
+UTIs não fecham o dia às 00:00 — o plantão é a unidade real de trabalho. O sistema trata isso
+nativamente: o plantão começa às 07:00 e vai até 06:59 do dia seguinte, então os lançamentos e
+fechamentos ficam sempre no período assistencial correto, independente da virada do calendário.
 
-### Mapeamento de Registros
-| Entradas (Ganhos) | Saídas (Perdas) |
-| :--- | :--- |
-| Medicações | Diurese |
-| Nutrição Enteral | Drenos |
-| Nutrição Parenteral | SNE / SNG |
-| Hidratação Venosa | Fezes |
-| Outras Entradas | Outras Saídas |
+**Mapeamento de registros**
 
-### Prontuário e Auditoria
-A geração de relatórios é otimizada para o prontuário físico e para a segurança jurídica da instituição:
-* Layout em formato A4 Paisagem com expansão dinâmica de linhas.
-* Prevenção de truncamento para listas complexas de medicamentos.
-* Injeção dinâmica da assinatura autenticada do profissional logado no rodapé do documento.
+| Entradas (ganhos)   | Saídas (perdas) |
+| -------------------- | ---------------- |
+| Medicações            | Diurese          |
+| Nutrição enteral      | Drenos           |
+| Nutrição parenteral   | SNE / SNG        |
+| Hidratação venosa     | Fezes            |
+| Outras entradas       | Outras saídas    |
 
----
+**Prontuário e auditoria**
+- Relatório em A4 paisagem com expansão dinâmica de linhas (sem truncar listas longas de
+  medicamentos).
+- Assinatura do profissional autenticado é anexada automaticamente ao rodapé do documento
+  gerado, para dar rastreabilidade jurídica ao registro.
 
-## Arquitetura e Stack Tecnológica
+## Stack
 
-O sistema adota uma arquitetura baseada em serviços independentes, com forte tipagem ponta a ponta e separação estrita entre lógica de roteamento e regras de negócio.
+| Camada | Tecnologia | Uso |
+| ------ | ---------- | --- |
+| Frontend | Next.js (App Router), TypeScript, Zod | Interface, roteamento e validação de formulários |
+| Frontend | Tailwind CSS | Estilização (tema claro, pensado para leitura rápida em ambiente de UTI) |
+| Backend | FastAPI (Python 3) | API REST |
+| Backend | SQLAlchemy + Alembic | ORM e versionamento de schema do banco |
+| Backend | Pydantic | Validação e serialização de entrada/saída |
+| Banco | PostgreSQL | Persistência relacional |
+| Testes | Pytest, Vitest, Playwright | Testes unitários (back e front) e end-to-end |
 
-| Camada | Tecnologia | Propósito |
-| :--- | :--- | :--- |
-| **Frontend** | Next.js (App Router) | Framework React, roteamento e renderização |
-| | TypeScript, Zod | Tipagem estática e validação de schemas |
-| | Tailwind CSS | Estilização (Clinical Light Theme otimizado para UTI) |
-| **Backend** | FastAPI, Python 3 | API REST de alta performance |
-| | SQLAlchemy, Alembic | ORM e versionamento contínuo de banco de dados |
-| | Pydantic | Serialização e validação de dados de entrada/saída |
-| **Persistência** | PostgreSQL | Banco de dados relacional |
-| **Qualidade (QA)**| Pytest, Vitest, Playwright | Cobertura unitária e testes End-to-End |
+## Segurança
 
----
+Alguns pontos que valem registrar, já que é um sistema que lida com dados clínicos:
 
-## Estrutura do Repositório
+- **Autenticação:** login baseado em JWT. Sem token válido, os endpoints protegidos da API
+  rejeitam a requisição.
+- **Validação de entrada em duas camadas:** o frontend valida com Zod antes de enviar, e o
+  backend valida de novo com Pydantic — nunca confio só na validação do cliente.
+- **Consultas parametrizadas:** todo acesso ao banco passa pelo SQLAlchemy (ORM), o que evita
+  concatenar SQL manualmente e reduz a superfície pra SQL injection.
+- **Segredos fora do repositório:** credenciais de banco e chave de assinatura do JWT ficam em
+  variáveis de ambiente, nunca versionadas no código.
 
-```text
+Isso não é uma auditoria de segurança formal, é um projeto pessoal em evolução — mas é assim que
+tento tratar dados sensíveis desde o início, não como algo pra adicionar depois.
+
+## Estrutura do repositório
+
+```
 hidrocare/
 ├── frontend/
 │   ├── app/            # Rotas e páginas (App Router)
 │   ├── components/     # Componentes React reutilizáveis
 │   ├── hooks/          # Hooks personalizados
 │   ├── lib/            # Utilitários e configurações
-│   ├── types/          # Definições de tipos TypeScript
-│   └── tests/          # Testes unitários (Vitest) e E2E (Playwright)
+│   ├── types/          # Tipos TypeScript
+│   └── tests/          # Testes (Vitest e Playwright)
 │
 ├── backend/
 │   ├── app/
 │   │   ├── routers/    # Endpoints da API
 │   │   ├── models/     # Modelos SQLAlchemy
 │   │   ├── schemas/    # Schemas Pydantic
-│   │   ├── services/   # Lógica de negócio e cálculos clínicos
+│   │   ├── services/   # Regras de negócio e cálculos clínicos
 │   │   └── database/   # Configuração e sessão do banco
-│   ├── alembic/        # Migrações versionadas
+│   ├── alembic/        # Migrations versionadas
 │   └── tests/          # Testes automatizados (Pytest)
-Guia de Execução Local
-Pré-requisitos
-Node.js (v18+)
+```
 
-Python (v3.10+)
+## Roadmap / próximos passos
 
-PostgreSQL em execução
+- [ ] Cobertura de testes para os casos de borda do cálculo de plantão
+- [ ] Auditoria formal de segurança (dependências, headers HTTP, rate limiting)
+- [ ] Deploy com CI/CD (GitHub Actions)
 
-Configuração do Backend
-Bash
-git clone [https://github.com/SEU_USUARIO/hidrocare.git](https://github.com/SEU_USUARIO/hidrocare.git)
-cd hidrocare/backend
+---
 
-# Configurar e ativar ambiente virtual
-python -m venv .venv
-source .venv/bin/activate    # Linux / macOS
-# .venv\Scripts\activate     # Windows
-
-# Instalar dependências e iniciar o servidor
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-A API estará disponível em http://localhost:8000 e a documentação OpenAPI em http://localhost:8000/docs.
-
-Configuração do Frontend
-Bash
-cd ../frontend
-
-# Instalar dependências e iniciar o servidor
-npm install
-npm run dev
-A interface estará disponível em http://localhost:3000.
-
-Execução de Testes
-Para validação da integridade das regras de negócio:
-
-Bash
-# Backend (na pasta /backend)
-pytest
-
-# Frontend Unitário (na pasta /frontend)
-npm run test
-
-# Frontend E2E (na pasta /frontend)
-npx playwright test
-HidroCare — Precisão matemática para o apoio à decisão clínica.
+Projeto pessoal, aberto a feedback e sugestões via issues.
