@@ -9,6 +9,7 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Alert } from "@/components/ui/alert";
 
 import { useFluidGrid, getOccurredAt, SHIFT_HOURS } from "./use-fluid-grid";
 import { FluidRecord, DailySpreadsheetPayload, CurrentUser, VitalSignRecord } from "./types";
@@ -44,6 +45,13 @@ export function ClinicalSpreadsheet({ patientId, targetDate }: ClinicalSpreadshe
 
   return (
     <TooltipProvider delayDuration={150}>
+      {grid.isBackdated && (
+        <Alert variant="warning" className="mb-3 print:hidden">
+          <span className="font-semibold">Data fora da janela de registro.{" "}</span>
+          Registros só podem ser criados dentro das últimas 24 horas e não podem ser futuros.
+          Esta data não permite novos lançamentos, mas você pode visualizar os registros existentes.
+        </Alert>
+      )}
       <div className="rounded-xl border border-slate-200 bg-white text-slate-900 shadow-card overflow-hidden print:border-black print:bg-white print:text-black print:rounded-none print:shadow-none">
         <div className="w-full overflow-x-auto print:overflow-visible">
           <table className="w-full border-collapse text-xs print-table">

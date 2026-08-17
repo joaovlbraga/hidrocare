@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -105,6 +105,29 @@ class PatientPublic(PatientCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _validate_occurred_at_window(v: datetime) -> datetime:
+    """Rejects occurred_at timestamps older than 24 h or in the future.
+
+    Called from FluidRecordCreate and VitalSignCreate via @field_validator.
+    Applies ONLY to record creation — update/delete flows do not use these schemas.
+    """
+    # NOTE: assumes server runs in local hospital timezone
+    if v.tzinfo is not None:
+        v = v.replace(tzinfo=None)
+    now = datetime.now()
+    if v > now:
+        raise ValueError(
+            "O horário do registro não pode ser no futuro. "
+            "Verifique a data e hora informadas."
+        )
+    if v < now - timedelta(hours=24):
+        raise ValueError(
+            "Não é possível registrar eventos com mais de 24 horas de antecedência. "
+            "Verifique a data e hora do lançamento."
+        )
+    return v
+
+
 class FluidRecordCreate(BaseModel):
     patient_id: int
     direction: FluidDirection
@@ -112,6 +135,11 @@ class FluidRecordCreate(BaseModel):
     volume_ml: float | str | None = Field(default=None, description="Volume em ml ou medição qualitativa (+, ++, +++). Obrigatório a menos que 'notes' seja fornecido.")
     occurred_at: datetime
     notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, v: datetime) -> datetime:
+        return _validate_occurred_at_window(v)
 
     @field_validator("volume_ml", mode="before")
     @classmethod
@@ -243,6 +271,11 @@ class VitalSignBase(BaseModel):
 class VitalSignCreate(VitalSignBase):
     patient_id: int
     occurred_at: datetime
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, v: datetime) -> datetime:
+        return _validate_occurred_at_window(v)
 
 
 class VitalSignUpdate(VitalSignBase):

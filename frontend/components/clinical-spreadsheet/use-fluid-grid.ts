@@ -23,6 +23,18 @@ export function getOccurredAt(dateStr: string, hourStr: string): string {
   return `${effectiveDate}T${hourStr}:00`;
 }
 
+/**
+ * Returns true if the given ISO timestamp is outside the allowed creation window:
+ * - More than 24 hours in the past, OR
+ * - In the future (future clinical events cannot be logged).
+ * This is a client-side UX convenience check; the backend enforces the same rule.
+ */
+export function isOutsideAllowedWindow(occurredAt: string): boolean {
+  const ts = new Date(occurredAt).getTime();
+  const now = Date.now();
+  return ts < now - 24 * 60 * 60 * 1000 || ts > now;
+}
+
 export function useFluidGrid(patientId: number, targetDate: string) {
   const [fluids, setFluids] = useState<FluidRecord[]>([]);
   const [vitals, setVitals] = useState<VitalSignRecord[]>([]);
@@ -53,6 +65,15 @@ export function useFluidGrid(patientId: number, targetDate: string) {
     const shiftEnd = new Date(`${nextDay}T07:00:00`);
     return new Date() >= shiftEnd;
   }, [targetDate, currentUser?.role]);
+
+  // True when the *entire* selected shift day falls outside the 24-hour allowed window.
+  // The earliest possible occurred_at on a given shift date is 07:00 of that date.
+  // If even 07:00 of targetDate is already more than 24 h ago (or in the future), the
+  // whole date is invalid for new record creation.
+  const isBackdated = useMemo(() => {
+    const shiftStart = new Date(`${targetDate}T07:00:00`);
+    return isOutsideAllowedWindow(shiftStart.toISOString());
+  }, [targetDate]);
 
   const loadFluidsData = useCallback(() => {
     let active = true;
@@ -204,6 +225,11 @@ export function useFluidGrid(patientId: number, targetDate: string) {
             );
             triggerSuccess(cellKey);
           } else {
+            // Guard: reject creation if the cell's timestamp is outside the allowed window.
+            if (isOutsideAllowedWindow(occurredAt)) {
+              setErrorMap((prev) => ({ ...prev, [cellKey]: true }));
+              return;
+            }
             const res = await apiFetch("/balances/records", {
               method: "POST",
               body: JSON.stringify({
@@ -265,6 +291,13 @@ export function useFluidGrid(patientId: number, targetDate: string) {
       try {
         const parsedValue = field === "blood_pressure" ? trimmed || null : (trimmed === "" ? null : parseFloat(trimmed));
 
+        // Guard: reject creation if the cell's timestamp is outside the allowed window.
+        if (isOutsideAllowedWindow(occurredAt)) {
+          setErrorMap((prev) => ({ ...prev, [cellKey]: true }));
+          setSavingMap((prev) => ({ ...prev, [cellKey]: false }));
+          return;
+        }
+
         const res = await apiFetch("/vitals/records", {
           method: "POST",
           body: JSON.stringify({
@@ -303,6 +336,10 @@ export function useFluidGrid(patientId: number, targetDate: string) {
       notes: string
     ) => {
       const occurredAt = getOccurredAt(targetDate, hour);
+      // Guard: reject creation if the timestamp is outside the allowed window.
+      if (isOutsideAllowedWindow(occurredAt)) {
+        throw new Error("Não é possível registrar eventos fora da janela de 24 horas permitida.");
+      }
       const payloadVol = volumeRaw.trim() === "" ? null : volumeRaw.trim();
       const res = await apiFetch("/balances/records", {
         method: "POST",
@@ -383,6 +420,10 @@ export function useFluidGrid(patientId: number, targetDate: string) {
       notes: string
     ) => {
       const occurredAt = getOccurredAt(targetDate, hour);
+      // Guard: reject creation if the timestamp is outside the allowed window.
+      if (isOutsideAllowedWindow(occurredAt)) {
+        throw new Error("Não é possível registrar eventos fora da janela de 24 horas permitida.");
+      }
       const res = await apiFetch("/balances/records", {
         method: "POST",
         body: JSON.stringify({
@@ -483,6 +524,7 @@ export function useFluidGrid(patientId: number, targetDate: string) {
     successMap,
     errorMap,
     isReadOnlyShift,
+    isBackdated,
     fluidsByHourCategoryMap,
     vitalsByHourMap,
     totals,

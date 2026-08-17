@@ -1,4 +1,6 @@
 import pytest
+from datetime import datetime
+from unittest.mock import patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -38,6 +40,26 @@ app.dependency_overrides[get_db] = override_get_db
 app.dependency_overrides[get_current_user] = override_get_current_user
 app.dependency_overrides[require_roles(UserRole.ADMIN)] = override_get_current_user
 app.dependency_overrides[require_roles(UserRole.ADMIN, UserRole.DEVELOPER)] = override_get_current_user
+
+# ---------------------------------------------------------------------------
+# Bypass the 24-hour backdate/future window validator for the entire test
+# session.
+#
+# Existing tests use hardcoded timestamps from 2026-08-03 to 2026-08-06 as
+# well as real-time relative helpers (_yesterday_shift_time, _today_shift_time
+# in test_shift_lock.py that resolve to real "today" / "yesterday" dates).
+# There is no single frozen "now" that makes both families simultaneously valid.
+#
+# The validator's correctness is covered by dedicated tests in
+# test_backdate_validation.py. All other tests only need creation to succeed so
+# that they can test the features they were written for.
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True, scope="session")
+def bypass_backdate_validator():
+    """Patch _validate_occurred_at_window to a no-op for the test session."""
+    with patch("app.schemas._validate_occurred_at_window", side_effect=lambda v: v):
+        yield
+
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
