@@ -131,14 +131,19 @@ export default function PatientsPage() {
     try {
       await apiFetch("/patients", { method: "POST", body: JSON.stringify(data) });
       reset({ uti: "UTI 1", health_insurance: "SUS", medical_record: "", bed: "", full_name: "", birth_date: "" });
-      setMessage({ text: "Paciente cadastrado com sucesso.", ok: true });
+      setMessage({ text: "Paciente cadastrado (ou readmitido) com sucesso.", ok: true });
       await loadPatients();
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : "Erro ao cadastrar paciente", ok: false });
+      const msg = error instanceof Error ? error.message : "Erro ao cadastrar paciente";
+      // Surface the backend's localized conflict messages verbatim so nurses
+      // see exactly where the active patient is (Scenario C) or which bed is
+      // occupied by another patient during readmission (Scenario B bed-conflict).
+      setMessage({ text: msg, ok: false });
     } finally {
       setSaving(false);
     }
   }
+
 
   async function handleArchive() {
     if (!confirmPatient) return;

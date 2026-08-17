@@ -56,8 +56,8 @@ app.dependency_overrides[require_roles(UserRole.ADMIN, UserRole.DEVELOPER)] = ov
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True, scope="session")
 def bypass_backdate_validator():
-    """Patch _validate_occurred_at_window to a no-op for the test session."""
-    with patch("app.schemas._validate_occurred_at_window", side_effect=lambda v: v):
+    """Patch assert_can_create_at to a no-op for the test session."""
+    with patch("app.services.record_permissions.assert_can_create_at", return_value=None):
         yield
 
 

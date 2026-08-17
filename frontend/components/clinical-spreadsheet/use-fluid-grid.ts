@@ -26,13 +26,13 @@ export function getOccurredAt(dateStr: string, hourStr: string): string {
 /**
  * Returns true if the given ISO timestamp is outside the allowed creation window:
  * - More than 24 hours in the past, OR
- * - In the future (future clinical events cannot be logged).
+ * - More than 24 hours in the future.
  * This is a client-side UX convenience check; the backend enforces the same rule.
  */
 export function isOutsideAllowedWindow(occurredAt: string): boolean {
   const ts = new Date(occurredAt).getTime();
   const now = Date.now();
-  return ts < now - 24 * 60 * 60 * 1000 || ts > now;
+  return ts < now - 24 * 60 * 60 * 1000 || ts > now + 24 * 60 * 60 * 1000;
 }
 
 export function useFluidGrid(patientId: number, targetDate: string) {
@@ -66,14 +66,15 @@ export function useFluidGrid(patientId: number, targetDate: string) {
     return new Date() >= shiftEnd;
   }, [targetDate, currentUser?.role]);
 
-  // True when the *entire* selected shift day falls outside the 24-hour allowed window.
-  // The earliest possible occurred_at on a given shift date is 07:00 of that date.
-  // If even 07:00 of targetDate is already more than 24 h ago (or in the future), the
-  // whole date is invalid for new record creation.
-  const isBackdated = useMemo(() => {
-    const shiftStart = new Date(`${targetDate}T07:00:00`);
-    return isOutsideAllowedWindow(shiftStart.toISOString());
-  }, [targetDate]);
+  // Clock ticker: increments every 60 seconds so that per-row
+  // isOutsideAllowedWindow() evaluations stay live as wall-clock time advances.
+  // This causes the grid to re-render and correctly transition rows between
+  // locked/unlocked without requiring a manual page refresh.
+  const [_clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setClockTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const loadFluidsData = useCallback(() => {
     let active = true;
@@ -524,7 +525,6 @@ export function useFluidGrid(patientId: number, targetDate: string) {
     successMap,
     errorMap,
     isReadOnlyShift,
-    isBackdated,
     fluidsByHourCategoryMap,
     vitalsByHourMap,
     totals,

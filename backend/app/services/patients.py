@@ -35,16 +35,47 @@ def check_bed_occupancy(db: Session, uti: str, bed: str, exclude_patient_id: int
 
 
 def create_patient(db: Session, payload: PatientCreate):
-    if db.scalar(select(Patient).where(Patient.medical_record == payload.medical_record)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Prontuário já cadastrado")
-        
+    existing = db.scalar(select(Patient).where(Patient.medical_record == payload.medical_record))
+
+    if existing is not None:
+        # ── Scenario C — Active conflict ──────────────────────────────────────
+        # The patient is already admitted and active. Block with an actionable
+        # message naming the current unit and bed.
+        if existing.is_active and existing.is_admitted:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Este paciente já está internado na {existing.uti}, leito {existing.bed}. "
+                    "Faça a transferência em vez de um novo cadastro."
+                ),
+            )
+
+        # ── Scenario B — Readmission (patient is inactive / discharged) ───────
+        # Before reactivating, verify the requested bed is not occupied by a
+        # *different* active patient (check_bed_occupancy excludes existing.id).
+        check_bed_occupancy(db, payload.uti, payload.bed, exclude_patient_id=existing.id)
+
+        # Reactivate in-place — preserves the same primary key so all historical
+        # FluidRecord and VitalSignRecord rows remain linked automatically.
+        existing.is_active = True
+        existing.is_admitted = True
+        existing.uti = payload.uti
+        existing.bed = payload.bed
+        existing.full_name = payload.full_name
+        existing.birth_date = payload.birth_date
+        existing.health_insurance = payload.health_insurance
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    # ── Scenario A — New patient ──────────────────────────────────────────────
     check_bed_occupancy(db, payload.uti, payload.bed)
-    
     patient = Patient(**payload.model_dump())
     db.add(patient)
     db.commit()
     db.refresh(patient)
     return patient
+
 
 
 def update_patient(db: Session, patient_id: int, payload: PatientUpdate):

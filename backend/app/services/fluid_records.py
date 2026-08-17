@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import FluidDirection, FluidRecord, FluidType, Patient, User, VitalSignRecord
 from app.schemas import FluidRecordCreate, FluidRecordUpdate
-from app.services.record_permissions import assert_can_edit
+from app.services.record_permissions import assert_can_create_at, assert_can_edit
 from app.utils.time_windows import get_clinical_shift_window
 
 SINGLE_VALUE_CATEGORIES = {
@@ -55,6 +55,8 @@ def create_fluid_record(db: Session, payload: FluidRecordCreate, current_user: U
             db.commit()
             db.refresh(existing)
             return {"id": existing.id}
+
+    assert_can_create_at(payload.occurred_at, current_user)
 
     record = FluidRecord(
         patient_id=payload.patient_id,

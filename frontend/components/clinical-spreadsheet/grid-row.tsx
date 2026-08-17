@@ -1,4 +1,5 @@
 import React from "react";
+import { getOccurredAt, isOutsideAllowedWindow } from "./use-fluid-grid";
 import { SingleCellInput } from "./single-cell-input";
 import { MultiItemSheetCell } from "./multi-item-sheet-cell";
 import { NutritionSheetCell } from "./nutrition-sheet-cell";
@@ -8,6 +9,7 @@ import { FluidRecord, CurrentUser, VitalSignRecord } from "./types";
 type GridRowProps = {
   hour: string;
   rowIndex: number;
+  targetDate: string;
   fluidsByHourCategoryMap: Map<string, FluidRecord[]>;
   vitalsByHourMap: Map<string, VitalSignRecord>;
   savingMap: Record<string, boolean>;
@@ -27,6 +29,7 @@ type GridRowProps = {
 export default function GridRow({
   hour,
   rowIndex,
+  targetDate,
   fluidsByHourCategoryMap,
   vitalsByHourMap,
   savingMap,
@@ -42,6 +45,17 @@ export default function GridRow({
   handleVitalCellSave,
   handleKeyDown,
 }: GridRowProps) {
+  // Per-row lock: strictly bounded by the +/- 24h rolling window.
+  // The shift-lock is bypassed for cells within this window to allow retroactive/future edits.
+  const isPrivileged = currentUser?.role === "ADMIN" || currentUser?.role === "DEVELOPER";
+  const rowTimestamp = getOccurredAt(targetDate, hour);
+  const isWindowLocked = isOutsideAllowedWindow(rowTimestamp);
+  const isRowReadOnly = isPrivileged ? false : isWindowLocked;
+
+  // Tooltip reason text
+  const lockReason: string | undefined = isRowReadOnly
+    ? "Fora da janela de 24 horas — a edição não é permitida neste horário"
+    : undefined;
   const medsList = fluidsByHourCategoryMap.get(`${hour}-MEDICATION`) || [];
   const otherInputList = fluidsByHourCategoryMap.get(`${hour}-OTHER_INPUT`) || [];
   const nutritionList = [
@@ -72,7 +86,7 @@ export default function GridRow({
           title="Medicações & Infusões"
           records={medsList}
           currentUser={currentUser}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onAdd={handleAddMultiItemRecord}
           onDelete={handleDeleteRecord}
           onEdit={handleUpdateRecord}
@@ -87,7 +101,7 @@ export default function GridRow({
           title="Outras Entradas Hídricas"
           records={otherInputList}
           currentUser={currentUser}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onAdd={handleAddMultiItemRecord}
           onDelete={handleDeleteRecord}
           onEdit={handleUpdateRecord}
@@ -98,7 +112,7 @@ export default function GridRow({
         <NutritionSheetCell
           hour={hour}
           records={nutritionList}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onAdd={handleAddNutritionRecord}
           onDelete={handleDeleteRecord}
         />
@@ -115,7 +129,8 @@ export default function GridRow({
           isSaving={savingMap[`fluid-${hour}-IV_HYDRATION`]}
           isSuccess={successMap[`fluid-${hour}-IV_HYDRATION`]}
           isError={errorMap[`fluid-${hour}-IV_HYDRATION`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
+          lockReason={lockReason}
           onSave={handleFluidCellSave}
           onKeyDown={handleKeyDown}
         />
@@ -132,7 +147,8 @@ export default function GridRow({
           isSaving={savingMap[`fluid-${hour}-URINE`]}
           isSuccess={successMap[`fluid-${hour}-URINE`]}
           isError={errorMap[`fluid-${hour}-URINE`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
+          lockReason={lockReason}
           onSave={handleFluidCellSave}
           onKeyDown={handleKeyDown}
         />
@@ -149,7 +165,8 @@ export default function GridRow({
           isSaving={savingMap[`fluid-${hour}-SNE_SNG`]}
           isSuccess={successMap[`fluid-${hour}-SNE_SNG`]}
           isError={errorMap[`fluid-${hour}-SNE_SNG`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
+          lockReason={lockReason}
           onSave={handleFluidCellSave}
           onKeyDown={handleKeyDown}
         />
@@ -163,7 +180,7 @@ export default function GridRow({
           title="Drenos"
           records={drainList}
           currentUser={currentUser}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           volumeOptional
           onAdd={handleAddMultiItemRecord}
           onDelete={handleDeleteRecord}
@@ -179,7 +196,7 @@ export default function GridRow({
           title="Fezes"
           records={stoolList}
           currentUser={currentUser}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           volumeOptional
           onAdd={handleAddMultiItemRecord}
           onDelete={handleDeleteRecord}
@@ -195,7 +212,7 @@ export default function GridRow({
           title="Outras Saídas Hídricas"
           records={otherOutputList}
           currentUser={currentUser}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           volumeOptional
           onAdd={handleAddMultiItemRecord}
           onDelete={handleDeleteRecord}
@@ -212,7 +229,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-pulse`]}
           isSuccess={successMap[`vital-${hour}-pulse`]}
           isError={errorMap[`vital-${hour}-pulse`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>
@@ -226,7 +243,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-blood_pressure`]}
           isSuccess={successMap[`vital-${hour}-blood_pressure`]}
           isError={errorMap[`vital-${hour}-blood_pressure`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>
@@ -240,7 +257,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-temperature`]}
           isSuccess={successMap[`vital-${hour}-temperature`]}
           isError={errorMap[`vital-${hour}-temperature`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>
@@ -254,7 +271,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-respiration`]}
           isSuccess={successMap[`vital-${hour}-respiration`]}
           isError={errorMap[`vital-${hour}-respiration`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>
@@ -268,7 +285,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-spo2`]}
           isSuccess={successMap[`vital-${hour}-spo2`]}
           isError={errorMap[`vital-${hour}-spo2`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>
@@ -282,7 +299,7 @@ export default function GridRow({
           isSaving={savingMap[`vital-${hour}-hgt`]}
           isSuccess={successMap[`vital-${hour}-hgt`]}
           isError={errorMap[`vital-${hour}-hgt`]}
-          isReadOnly={isReadOnlyShift}
+          isReadOnly={isRowReadOnly}
           onSave={handleVitalCellSave}
         />
       </td>

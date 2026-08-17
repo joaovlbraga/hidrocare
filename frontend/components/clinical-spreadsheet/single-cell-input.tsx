@@ -17,6 +17,8 @@ export type SingleCellInputProps = {
   isSuccess?: boolean;
   isError?: boolean;
   isReadOnly?: boolean;
+  /** Human-readable reason shown in the lock tooltip. Defaults to the shift-lock message. */
+  lockReason?: string;
   onSave: (hour: string, category: string, direction: "INPUT" | "OUTPUT", valString: string) => void;
   onKeyDown: (e: KeyboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => void;
 };
@@ -32,6 +34,7 @@ export const SingleCellInput = React.memo(function SingleCellInput({
   isSuccess,
   isError,
   isReadOnly,
+  lockReason = "Plant\u00e3o encerrado \u2014 somente administradores podem editar",
   onSave,
   onKeyDown,
 }: SingleCellInputProps) {
@@ -89,7 +92,7 @@ export const SingleCellInput = React.memo(function SingleCellInput({
             <Lock className="pointer-events-auto absolute right-0.5 h-2.5 w-2.5 text-slate-400 print:hidden cursor-help" />
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs max-w-[200px] text-center">
-            Plantão encerrado — somente administradores podem editar
+            {lockReason}
           </TooltipContent>
         </Tooltip>
       )}

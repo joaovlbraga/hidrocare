@@ -5,12 +5,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Patient, User, VitalSignRecord
 from app.schemas import VitalSignCreate, VitalSignUpdate
-from app.services.record_permissions import assert_can_edit
+from app.services.record_permissions import assert_can_create_at, assert_can_edit
 
 
 def create_or_upsert_vital(db: Session, payload: VitalSignCreate, current_user: User):
     if not db.get(Patient, payload.patient_id):
         raise ValueError("Paciente não encontrado")
+
+
 
     existing = db.scalar(
         select(VitalSignRecord).where(
@@ -29,6 +31,7 @@ def create_or_upsert_vital(db: Session, payload: VitalSignCreate, current_user: 
         db.refresh(existing)
         return existing
 
+    assert_can_create_at(payload.occurred_at, current_user)
     record = VitalSignRecord(**payload.model_dump(), registered_by_id=current_user.id)
     db.add(record)
     db.commit()
