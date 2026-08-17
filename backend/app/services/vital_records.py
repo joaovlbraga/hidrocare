@@ -22,7 +22,7 @@ def create_or_upsert_vital(db: Session, payload: VitalSignCreate, current_user: 
     )
 
     if existing:
-        assert_can_edit(existing, current_user)
+        assert_can_edit(existing, current_user, skip_ownership=True)
         update_data = payload.model_dump(exclude_unset=True, exclude={"patient_id", "occurred_at"})
         for field, val in update_data.items():
             setattr(existing, field, val)

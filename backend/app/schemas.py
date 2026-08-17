@@ -113,6 +113,13 @@ class FluidRecordCreate(BaseModel):
     occurred_at: datetime
     notes: str | None = Field(default=None, max_length=1000)
 
+    @field_validator("occurred_at")
+    @classmethod
+    def normalize_timezone(cls, v: datetime) -> datetime:
+        if v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
+
 
     @field_validator("volume_ml", mode="before")
     @classmethod
@@ -245,6 +252,12 @@ class VitalSignCreate(VitalSignBase):
     patient_id: int
     occurred_at: datetime
 
+    @field_validator("occurred_at")
+    @classmethod
+    def normalize_timezone(cls, v: datetime) -> datetime:
+        if v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
 
 
 class VitalSignUpdate(VitalSignBase):

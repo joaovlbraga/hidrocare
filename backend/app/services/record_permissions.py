@@ -30,7 +30,7 @@ def assert_can_create_at(occurred_at: datetime, current_user) -> None:
                 detail="Não é possível registrar eventos com mais de 24 horas de antecedência. Verifique a data e hora do lançamento."
             )
 
-def assert_can_edit(record, current_user) -> None:
+def assert_can_edit(record, current_user, *, skip_ownership: bool = False) -> None:
     now = datetime.now()
     record_time = record.occurred_at
     if record_time.tzinfo is not None:
@@ -44,7 +44,7 @@ def assert_can_edit(record, current_user) -> None:
             return
         assert_can_mutate_record(record.occurred_at, current_user)
     
-    if current_user.role not in {UserRole.ADMIN, UserRole.DEVELOPER}:
+    if not skip_ownership and current_user.role not in {UserRole.ADMIN, UserRole.DEVELOPER}:
         if record.registered_by_id != current_user.id:
             raise HTTPException(
                 status_code=403,

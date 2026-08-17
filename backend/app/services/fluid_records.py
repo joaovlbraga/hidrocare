@@ -45,7 +45,7 @@ def create_fluid_record(db: Session, payload: FluidRecordCreate, current_user: U
         ).first()
 
         if existing:
-            assert_can_edit(existing, current_user)
+            assert_can_edit(existing, current_user, skip_ownership=True)
             existing.volume_ml = vol_num
             existing.qualitative_value = qual_str
             if payload.notes is not None:
